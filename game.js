@@ -1283,7 +1283,7 @@ const HF_TEX = {
   roof:      HF + '173816_0bfc50ac-de26-4d9c-8c15-23e3c60f12f8.png',
   foliage:   HF + '173817_b662c4f6-0d95-4fac-b44a-d293fcc486f2.png',
 };
-const HF_MODELS = { soldier: '__SOLDIER__', rifle: '__RIFLE__' };
+const HF_MODELS = { soldier: HF + '173841_bba10e5a-6c81-4ece-9d12-68651f0ad91a.glb', rifle: HF + '173843_824599f6-4ea8-4128-bc98-f0fbac851e22.glb' };
 
 const crateMat = new THREE.MeshStandardMaterial({ color: 0x3d4a2a, roughness: 0.8 });
 const texLoader = new THREE.TextureLoader(); texLoader.setCrossOrigin('anonymous');
