@@ -5,6 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mat, part } from './Models.js';
+import { MapRenderer } from './MapRenderer.js';
 
 const RARITY = { common: 0xbbbbbb, uncommon: 0x6fd16f, rare: 0x4fa8ff, epic: 0xb36bff, legendary: 0xffb13a };
 const LOOT_COLOR = { cash: 0x6fdc6f, plate: 0x6ec6ff, ammo: 0xd8c14a, heal: 0xff7070, lethal: 0x9aa05a, intel: 0xffb13a };
@@ -45,41 +46,11 @@ export class World {
 
   // ------------------------------------------------------------ mapa estático
   buildMap(mapView, geo) {
-    if (this.mapGroup) this.scene.remove(this.mapGroup);
-    const g = this.mapGroup = new THREE.Group(); this.scene.add(g);
-    const size = mapView.size, half = size / 2;
-    const groundTex = this.canvasTex(256, (c, w) => { c.fillStyle = '#6d6a3e'; c.fillRect(0, 0, w, w); for (let i = 0; i < 3000; i++) { c.fillStyle = `rgba(${60 + Math.random() * 60},${60 + Math.random() * 50},${30 + Math.random() * 20},.5)`; c.fillRect(Math.random() * w, Math.random() * w, 2, 2); } }, 60);
-    const groundMat = new THREE.MeshStandardMaterial({ map: groundTex, roughness: 1 });
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(size, size), groundMat); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; g.add(ground);
-    this.hfTex('ground', 70, 70, t => { groundMat.map = t; groundMat.color.set(0xffffff); groundMat.needsUpdate = true; });
-    const sea = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshStandardMaterial({ color: 0x2b6f8a, roughness: 0.25, metalness: 0.3 })); sea.rotation.x = -Math.PI / 2; sea.position.y = -0.4; g.add(sea);
-    const beach = new THREE.Mesh(new THREE.PlaneGeometry(size + 30, size + 30), mat(0xcdb485)); beach.rotation.x = -Math.PI / 2; beach.position.y = -0.2; g.add(beach);
-
-    const facades = ['#b9a58a', '#8f7f6a', '#a36b4f', '#c7c0b0', '#7d8a8c'].map(c => new THREE.MeshStandardMaterial({ map: this.windowTex(c), roughness: 0.9 }));
-    const roofMat = new THREE.MeshStandardMaterial({ color: 0x4a403a, roughness: 0.95 });
-    const contMats = [0xa33b2c, 0x2c5ea3, 0x3f7a3a, 0xc08a2a].map(c => new THREE.MeshStandardMaterial({ color: c, roughness: 0.7, metalness: 0.3 }));
-    const coverMat = new THREE.MeshStandardMaterial({ color: 0x8b7d5a, roughness: 1 });
-    const ladderMat = mat(0x333333, { metalness: 0.6 });
-    this.hfTex('facade', 1, 1, t => facades.forEach((m, i) => { if (i % 2 === 0) { m.map = t; m.needsUpdate = true; } }));
-    this.hfTex('brick', 1, 1, t => facades.forEach((m, i) => { if (i % 2 === 1) { m.map = t; m.needsUpdate = true; } }));
-    this.hfTex('roof', 2, 2, t => { roofMat.map = t; roofMat.color.set(0xffffff); roofMat.needsUpdate = true; });
-    this.hfTex('container', 2, 1, t => contMats.forEach(m => { m.map = t; m.needsUpdate = true; }));
-    geo.boxes.forEach((b, i) => {
-      const w = b.maxX - b.minX, d = b.maxZ - b.minZ, h = b.h, cx = (b.minX + b.maxX) / 2, cz = (b.minZ + b.maxZ) / 2;
-      const m = b.kind === 'building' ? facades[i % facades.length] : b.kind === 'container' ? contMats[i % 4] : coverMat;
-      const boxGeo = new THREE.BoxGeometry(w, h, d);
-      if (b.kind === 'building') { const uv = boxGeo.attributes.uv; for (let k = 0; k < uv.count; k++) { const f = Math.floor(k / 4); uv.setXY(k, uv.getX(k) * (f < 2 ? d : w) / 6, uv.getY(k) * (f === 2 || f === 3 ? d / 6 : h / 8)); } }
-      const mesh = new THREE.Mesh(boxGeo, m); mesh.position.set(cx, h / 2, cz); mesh.castShadow = mesh.receiveShadow = true; g.add(mesh);
-      if (b.kind === 'building') { const roof = new THREE.Mesh(new THREE.BoxGeometry(w + 0.4, 0.3, d + 0.4), roofMat); roof.position.set(cx, h + 0.15, cz); roof.receiveShadow = true; g.add(roof); }
-      if (b.climb) { // escada no lado sul (z máximo) indicando superfície escalável
-        const lad = new THREE.Group();
-        lad.add(part(new THREE.BoxGeometry(0.06, h, 0.06), ladderMat, -0.3, h / 2, 0), part(new THREE.BoxGeometry(0.06, h, 0.06), ladderMat, 0.3, h / 2, 0));
-        for (let y = 0.3; y < h; y += 0.4) lad.add(part(new THREE.BoxGeometry(0.6, 0.04, 0.04), ladderMat, 0, y, 0));
-        lad.position.set(cx, 0, b.maxZ + 0.04); g.add(lad);
-      }
-    });
-    // nomes dos POIs no chão (decal simples)
-    this.pois = mapView.pois;
+    if (this.mapGroup) { this.scene.remove(this.mapGroup); this.mapGroup.traverse(o => { o.geometry?.dispose(); }); }
+    this.mapRenderer ??= new MapRenderer(this);
+    this.mapGroup = this.mapRenderer.build(mapView, geo, this.quality);
+    this.scene.add(this.mapGroup);
+    this.pois = mapView.pois; this.geo = geo;
   }
   windowTex(base) {
     return this.canvasTex(64, (g) => { g.fillStyle = base; g.fillRect(0, 0, 64, 128); for (let y = 8; y < 128; y += 24) for (let x = 6; x < 64; x += 20) { g.fillStyle = Math.random() < 0.3 ? '#d9a55a' : '#1d2630'; g.fillRect(x, y, 12, 14); } }, 1, 128);
@@ -101,8 +72,8 @@ export class World {
           gl_FragColor = vec4(mix(vec3(1., .42, .05), vec3(1., .75, .3), band), (.28 + band * .12) * fade + .04); }`,
     }));
     this.zoneWall.position.y = 100; this.dynamic.add(this.zoneWall);
-    this.nextZone = new THREE.Mesh(new THREE.RingGeometry(0.985, 1, 128), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
-    this.nextZone.rotation.x = -Math.PI / 2; this.nextZone.position.y = 0.15; this.dynamic.add(this.nextZone);
+    this.nextZone = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 60, 96, 1, true), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.1, side: THREE.DoubleSide, depthWrite: false }));
+    this.nextZone.position.y = 20; this.dynamic.add(this.nextZone);
     // estações
     this.stations = payload.stations ?? [];
     for (const s of this.stations) {
@@ -111,16 +82,27 @@ export class World {
       k.add(part(new THREE.BoxGeometry(0.9, 0.6, 0.05), new THREE.MeshBasicMaterial({ color: 0x7cff6b }), 0, 1.5, -0.43));
       const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 40, 8, 1, true), new THREE.MeshBasicMaterial({ color: 0x7cff6b, transparent: true, opacity: 0.18, depthWrite: false }));
       beam.position.y = 20; k.add(beam);
-      k.position.set(s.x, 0, s.z); k.traverse(o => { if (o.isMesh) o.castShadow = true; }); this.dynamic.add(k);
+      k.position.set(s.x, s.y ?? 0, s.z); k.traverse(o => { if (o.isMesh) o.castShadow = true; }); this.dynamic.add(k);
     }
     // tablets de contrato
     this.boardMeshes = new Map();
     for (const b of payload.boards ?? []) {
       const k = new THREE.Group();
       k.add(part(new THREE.CylinderGeometry(0.05, 0.05, 1.0), mat(0x333333), 0, 0.5, 0), part(new THREE.BoxGeometry(0.6, 0.4, 0.05), new THREE.MeshStandardMaterial({ color: 0x111111, emissive: 0xffb13a, emissiveIntensity: 1.2 }), 0, 1.1, 0, -0.4));
-      k.position.set(b.x, 0, b.z); k.visible = !b.taken; this.dynamic.add(k); this.boardMeshes.set(b.id, k);
+      k.position.set(b.x, b.y ?? this.geo?.groundHeight(b.x, b.z, 200) ?? 0, b.z); k.visible = !b.taken; this.dynamic.add(k); this.boardMeshes.set(b.id, k);
     }
     for (const it of payload.loot ?? []) this.addLoot(it);
+    // baús de suprimento
+    this.chestMeshes = new Map();
+    const crateMat = new THREE.MeshStandardMaterial({ color: 0x3d4a2a, roughness: 0.8 }), trimMat = new THREE.MeshStandardMaterial({ color: 0xe8b13a, emissive: 0x6a4a00, emissiveIntensity: 0.8 });
+    for (const c of payload.chests ?? []) {
+      const k = new THREE.Group();
+      const body = part(new THREE.BoxGeometry(1.1, 0.55, 0.65), crateMat, 0, 0.28, 0), lid = part(new THREE.BoxGeometry(1.12, 0.12, 0.67), crateMat, 0, 0.6, 0);
+      const trim = part(new THREE.BoxGeometry(1.14, 0.06, 0.69), trimMat, 0, 0.52, 0);
+      k.add(body, lid, trim); k.position.set(c.x, c.y, c.z); k.rotation.y = c.rot ?? 0; k.userData = { lid, trim, item: c };
+      k.traverse(o => { if (o.isMesh) o.castShadow = true; });
+      this.dynamic.add(k); this.chestMeshes.set(c.id, k); if (c.opened) this.setChestOpened(c.id);
+    }
     // aeronave
     const plane = this.plane = new THREE.Group();
     plane.add(part(new THREE.CylinderGeometry(1.4, 1.1, 16, 12), mat(0x6b6f5a, { metalness: 0.4 }), 0, 0, 0, Math.PI / 2));
@@ -147,13 +129,14 @@ export class World {
     beam.position.y = 3; g.add(core, beam); g.userData = { core, beam }; return g;
   }
   removeLoot(id) { const m = this.loot.get(id); if (!m) return; this.dynamic.remove(m); this.loot.delete(id); this.lootPool.push(m); }
+  setChestOpened(id) { const k = this.chestMeshes?.get(id); if (!k) return; k.userData.item.opened = true; k.userData.lid.rotation.x = -1.9; k.userData.lid.position.set(0, 0.75, -0.35); k.userData.trim.material = mat(0x333333); }
   setBoard(id, taken) { const m = this.boardMeshes?.get(id); if (m) m.visible = !taken; }
 
   update(dt, snap, camPos, time) {
     if (this.zoneWall && snap) {
       const z = snap.zone; this.zoneWall.scale.set(Math.max(0.1, z.r), 1, Math.max(0.1, z.r)); this.zoneWall.position.x = z.x; this.zoneWall.position.z = z.z;
       this.zoneWall.material.uniforms.time.value = time;
-      this.nextZone.scale.setScalar(Math.max(0.1, z.to.r)); this.nextZone.position.x = z.to.x; this.nextZone.position.z = z.to.z;
+      this.nextZone.scale.set(Math.max(0.1, z.to.r), 1, Math.max(0.1, z.to.r)); this.nextZone.position.x = z.to.x; this.nextZone.position.z = z.to.z;
       const a = snap.match.aircraft; this.plane.visible = !!a;
       if (a) { const k = Math.min(1, a.t / a.duration); this.plane.position.set(a.start.x + (a.end.x - a.start.x) * k, a.altitude + 4, a.start.z + (a.end.z - a.start.z) * k); this.plane.rotation.y = Math.atan2(-(a.end.x - a.start.x), -(a.end.z - a.start.z)); }
       const c = snap.you.contract, pt = c && (c.area ?? c.cache ?? c.lastSeen);

@@ -101,7 +101,7 @@ export class HUDSystem {
     // mapas
     this.shots = this.shots.filter(p => p.until > now);
     this.drawMap(this.mm, 220, v, v.pos.x, v.pos.z, 1.25, true);
-    if (!$('bigmap').classList.contains('hidden')) this.drawMap(this.bm, 640, v, 0, 0, 640 / (v.mapView.size * 1.08), false);
+    if (!$('bigmap').classList.contains('hidden')) this.drawMap(this.bm, this.bm.canvas.width, v, 0, 0, this.bm.canvas.width / (v.mapView.size * 1.08), false);
     $('netStatus').textContent = v.netText ?? '';
   }
 
@@ -110,7 +110,7 @@ export class HUDSystem {
     ctx.save(); ctx.fillStyle = '#23566b'; ctx.fillRect(0, 0, size, size); ctx.translate(size / 2, size / 2);
     if (rotate) ctx.rotate(v.yaw); ctx.scale(scale, scale); ctx.translate(-cx, -cz);
     const h = map.size / 2; ctx.fillStyle = '#c8b286'; ctx.fillRect(-h - 12, -h - 12, map.size + 24, map.size + 24); ctx.fillStyle = '#5f6040'; ctx.fillRect(-h, -h, map.size, map.size);
-    for (const b of v.geo.boxes) { ctx.fillStyle = b.kind === 'building' ? '#a79d88' : b.kind === 'container' ? '#8a5a44' : '#7d7458'; ctx.fillRect(b.minX, b.minZ, b.maxX - b.minX, b.maxZ - b.minZ); }
+    const bg = this.mapImage(v.geo, map.size); ctx.drawImage(bg, -h, -h, map.size, map.size);
     const z = s.zone; ctx.fillStyle = 'rgba(255,100,0,.38)'; ctx.beginPath(); ctx.rect(-h * 3, -h * 3, map.size * 3, map.size * 3); ctx.arc(z.x, z.z, Math.max(0.1, z.r), 0, Math.PI * 2, true); ctx.fill();
     ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5 / scale; ctx.setLineDash([6 / scale, 4 / scale]); ctx.beginPath(); ctx.arc(z.to.x, z.to.z, Math.max(0.1, z.to.r), 0, 7); ctx.stroke(); ctx.setLineDash([]);
     if (!rotate) { ctx.fillStyle = '#fff'; ctx.font = `bold ${12 / scale}px sans-serif`; ctx.textAlign = 'center'; for (const p of map.pois) ctx.fillText(p.name.toUpperCase(), p.x, p.z); }
@@ -124,6 +124,28 @@ export class HUDSystem {
     ctx.translate(v.pos.x, v.pos.z); ctx.rotate(-v.yaw); ctx.fillStyle = '#e8b13a'; ctx.strokeStyle = '#000'; ctx.lineWidth = 1 / scale;
     ctx.beginPath(); ctx.moveTo(0, -7 / scale); ctx.lineTo(5 / scale, 6 / scale); ctx.lineTo(0, 3 / scale); ctx.lineTo(-5 / scale, 6 / scale); ctx.closePath(); ctx.fill(); ctx.stroke();
     ctx.restore();
+  }
+
+  /** Mapa de fundo pré-renderizado (terreno sombreado + construções), gerado uma vez por mapa. */
+  mapImage(geo, size) {
+    if (this.mapCache?.geo === geo) return this.mapCache.canvas;
+    const N = 768, c = document.createElement('canvas'); c.width = c.height = N; const g = c.getContext('2d'), s = N / size, half = size / 2;
+    const img = g.createImageData(N, N);
+    for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+      const x = -half + (i + 0.5) / s, z = -half + (j + 0.5) / s, h = geo.terrainHeight(x, z), hx = geo.terrainHeight(x + 1.5, z) - h;
+      const shade = Math.max(-30, Math.min(30, -hx * 18));
+      let r = 95 + h * 3 + shade, gg = 98 + h * 2.4 + shade, b = 62 + h * 1.2 + shade;
+      if (h < 0.6) { r = 196; gg = 178; b = 132; }
+      const k = (j * N + i) * 4; img.data[k] = r; img.data[k + 1] = gg; img.data[k + 2] = b; img.data[k + 3] = 255;
+    }
+    g.putImageData(img, 0, 0);
+    const col = { wall: '#d8cfbd', roof: '#9b948a', floor: '#bdb3a0', container: '#a4553f', cover: '#8d8260', rock: '#6f6b64', crate: '#8a6a3c', stair: '#bdb3a0' };
+    for (const b of [...geo.boxes].sort((p, q) => p.y1 - q.y1)) {
+      if (b.kind === 'trunk') { g.fillStyle = '#3d5a2a'; g.beginPath(); g.arc((b.minX + half) * s, (b.minZ + half) * s, 2.2 * s, 0, 7); g.fill(); continue; }
+      g.fillStyle = col[b.kind] ?? '#a79d88'; g.fillRect((b.minX + half) * s, (b.minZ + half) * s, Math.max(1, (b.maxX - b.minX) * s), Math.max(1, (b.maxZ - b.minZ) * s));
+    }
+    this.mapCache = { geo, canvas: c };
+    return c;
   }
 
   lobby(l, myId) {

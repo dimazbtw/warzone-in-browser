@@ -53,6 +53,7 @@ export class MatchStateSystem {
     ctx.systems.loot.spawnInitial();
     ctx.systems.contracts.spawnBoards();
     ctx.systems.stations.spawnStations();
+    ctx.systems.bots.ensureNav();
     ctx.systems.zone.start();
     this.createAircraft();
     for (const p of ctx.players.values()) {

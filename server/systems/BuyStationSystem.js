@@ -26,10 +26,10 @@ export class BuyStationSystem {
   get cfg() { return this.ctx.cfg.stations; }
 
   spawnStations() {
-    this.stations = this.cfg.enabled ? this.ctx.map.stationSpots.map((s, i) => ({ id: `B${i + 1}`, x: s.x, z: s.z })) : [];
+    this.stations = this.cfg.enabled ? this.ctx.map.stationSpots.map((s, i) => ({ id: `E${i + 1}`, x: s.x, y: s.y ?? 0, z: s.z })) : [];
     this.buybacksUsed.clear(); this.radar.clear();
   }
-  view() { return this.stations.map(s => ({ id: s.id, x: +s.x.toFixed(1), z: +s.z.toFixed(1) })); }
+  view() { return this.stations.map(s => ({ id: s.id, x: +s.x.toFixed(1), y: +s.y.toFixed(2), z: +s.z.toFixed(1) })); }
 
   requestBuy(p, msg) {
     const { ctx } = this, st = this.stations.find(s => s.id === msg.stationId), item = this.cfg.catalog[msg.item];

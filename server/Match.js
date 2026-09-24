@@ -131,6 +131,7 @@ export class Match {
       case C2S.RELOAD: S.inventory.requestReload(p); break;
       case C2S.SWITCH: S.inventory.requestSwitch(p, msg.slot); break;
       case C2S.PICKUP: S.loot.requestPickup(p, msg.lootId); break;
+      case C2S.CHEST: S.loot.requestChest(p, msg.chestId); break;
       case C2S.USE_PLATE: S.inventory.requestPlate(p); break;
       case C2S.USE_HEAL: S.inventory.requestHeal(p); break;
       case C2S.DEPLOY_CHUTE: if (p.is(PS.FREEFALL)) p.setState(PS.PARACHUTE, this.ctx.now()); break;

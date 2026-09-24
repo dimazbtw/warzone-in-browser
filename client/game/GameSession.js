@@ -137,6 +137,7 @@ export class GameSession {
       case 'contractCompleted': h.announce(`CONTRATO CONCLUÍDO · +$${e.reward.cash} · +${e.reward.xp} XP`, 3.5); a.cash(); break;
       case 'contractFailed': if (!e.start || e.playerId === me) h.notify(`Contrato: ${e.reason}`, 2.5); break;
       case 'plateBroken': if (e.attackerId === me) a.crack(); break;
+      case 'chestOpened': this.world.setChestOpened(e.chestId); if (e.playerId === me) { a.cash(); h.notify('BAÚ ABERTO', 1.2); } break;
       case 'matchEnded':
         this.inMatch = false; this.ended = true; this.input.enabled = false;
         if (document.pointerLockElement) document.exitPointerLock();
@@ -163,7 +164,7 @@ export class GameSession {
       case 'lethal': n.send(C2S.THROW, { yaw: i.yaw, pitch: i.pitch }); break;
       case 'tactical': n.send(C2S.TACTICAL, { yaw: i.yaw, pitch: i.pitch }); break;
       case 'melee': n.send(C2S.MELEE, { yaw: i.yaw }); break;
-      case 'interact': { const it = this.nearestLoot(); if (it) n.send(C2S.PICKUP, { lootId: it.id }); break; }
+      case 'interact': { const c = this.nearestChest(), it = this.nearestLoot(); if (c && (!it || c.d < it.d)) n.send(C2S.CHEST, { chestId: c.id }); else if (it) n.send(C2S.PICKUP, { lootId: it.id }); break; }
       case 'contract': { const b = this.nearBoard(); if (b) n.send(C2S.CONTRACT, { boardId: b.id }); else this.hud.notify('Nenhum tablet de contrato por perto', 1.5); break; }
       case 'shop': this.toggleShop(); break;
       case 'map': $('bigmap').classList.toggle('hidden'); break;
@@ -173,7 +174,12 @@ export class GameSession {
   }
   nearestLoot() {
     const p = this.pred.body.pos; let best = null, bd = this.cfg.loot.pickupRange;
-    for (const m of this.world.loot.values()) { const it = m.userData.item; if (it.type === 'intel' && !this.snap.you.contract) continue; const d = Math.hypot(it.x - p.x, it.z - p.z); if (d < bd) { bd = d; best = it; } }
+    for (const m of this.world.loot.values()) { const it = m.userData.item; if (it.type === 'intel' && !this.snap.you.contract) continue; if (Math.abs(it.y - p.y) > 1.8) continue; const d = Math.hypot(it.x - p.x, it.z - p.z); if (d < bd) { bd = d; best = { ...it, d }; } }
+    return best;
+  }
+  nearestChest() {
+    const p = this.pred.body.pos; let best = null, bd = this.cfg.loot.chestRange ?? 2.4;
+    for (const k of this.world.chestMeshes?.values() ?? []) { const c = k.userData.item; if (c.opened || Math.abs(c.y - p.y) > 1.8) continue; const d = Math.hypot(c.x - p.x, c.z - p.z); if (d < bd) { bd = d; best = { ...c, d }; } }
     return best;
   }
   nearBoard() { const p = this.pred.body.pos; return [...this.boards.values()].find(b => !b.taken && Math.hypot(b.x - p.x, b.z - p.z) < this.cfg.contracts.interactRange); }
@@ -242,6 +248,7 @@ export class GameSession {
       const eye = st === 'downed' ? 0.5 : body.slide ? 0.9 : EYE[body.stance] ?? 1.6;
       cam.position.set(pos.x, pos.y + eye, pos.z); cam.rotation.set(input.pitch, input.yaw, 0, 'YXZ');
     }
+    if (window.DEBUG_CAM) { const d = window.DEBUG_CAM; cam.position.set(d.x, d.y, d.z); cam.rotation.set(d.pitch ?? 0, d.yaw ?? 0, 0, 'YXZ'); }   // câmera livre de depuração
     if (this.shake > 0) { cam.position.x += (Math.random() - 0.5) * this.shake; cam.position.y += (Math.random() - 0.5) * this.shake; this.shake = Math.max(0, this.shake - dt * 1.5); }
     const sniper = y.ads && w?.id === 'marksman' && st === 'alive';
     const baseFov = settings.get('fov');
@@ -278,6 +285,7 @@ export class GameSession {
     const p = this.pred.body.pos;
     const ally = this.snap.others.find(o => o.a && o.s === 'downed' && Math.hypot(o.x - p.x, o.z - p.z) <= this.cfg.downed.reviveRange);
     if (ally) return `<b>[Segure E]</b> Reviver ${ally.n}`;
+    const ch = this.nearestChest(); if (ch && this.snap.you.action?.type !== 'chest') return '<b>[E]</b> Abrir baú de suprimentos';
     const it = this.nearestLoot();
     if (it) return `<b>[E]</b> ${it.type === 'weapon' ? `${this.cfg.weapons[it.data.id]?.name} <span style="color:${RAR_COLOR[it.rarity]}">(${it.rarity})</span>` : this.pickupText(it.type, it.data)}`;
     const b = this.nearBoard(); if (b) return `<b>[F]</b> Aceitar contrato: ${b.name}`;

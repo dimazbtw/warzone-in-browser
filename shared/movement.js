@@ -9,6 +9,8 @@
  */
 import { clamp } from './math.js';
 
+const FOOT_R = 0.28;   // raio dos pés para subir degraus e ficar em bordas
+
 export const MOVE_DEFAULTS = {
   slide: { speed: 12.5, duration: 0.75, friction: 0.9, cooldown: 1.0 },
   mantle: { maxHeight: 2.8, vaultMaxHeight: 1.3, vaultMaxThickness: 1.6, baseTime: 0.3, perMeter: 0.12 },
@@ -67,17 +69,16 @@ export function stepGround(b, input, dt, now, cfg, geo, opts = {}) {
   if (jumpPressed && input.mz < -0.3) {
     const ob = geo.obstacleAhead(b.pos, fwd.x, fwd.z, b.grounded ? 0.9 : 0.7);
     if (ob) {
-      const dh = ob.box.h - b.pos.y;
+      const top = ob.box.y1, dh = top - b.pos.y;
       if (dh <= M.mantle.maxHeight) {
         const thick = geo.thickness(ob.box, ob.x, ob.z, fwd.x, fwd.z);
         if (dh <= M.mantle.vaultMaxHeight && thick <= M.mantle.vaultMaxThickness) {
-          const tx = ob.x + fwd.x * (thick + 0.55), tz = ob.z + fwd.z * (thick + 0.55);
-          if (!geo.isBlocked(tx, tz, 0.35)) { startMantle(b, { x: tx, z: tz }, geo.groundHeight(tx, tz, b.pos.y), true, M, fwd); return ev; }
+          const tx = ob.x + fwd.x * (thick + 0.55), tz = ob.z + fwd.z * (thick + 0.55), ty = geo.groundHeight(tx, tz, top + 0.1);
+          if (ty <= top && geo.clearAt(tx, ty, tz)) { startMantle(b, { x: tx, z: tz }, ty, true, M, fwd); return ev; }
         }
         const tx = ob.x + fwd.x * 0.45, tz = ob.z + fwd.z * 0.45;
-        startMantle(b, { x: tx, z: tz }, ob.box.h, false, M, fwd); return ev;
-      }
-      if (ob.box.climb) { b.climb = { top: ob.box.h, x: ob.x + fwd.x * 0.45, z: ob.z + fwd.z * 0.45 }; b.slide = null; return ev; }
+        if (geo.clearAt(tx, top, tz, 0.3)) { startMantle(b, { x: tx, z: tz }, top, false, M, fwd); return ev; }
+      } else if (ob.box.climb) { b.climb = { top, x: ob.x + fwd.x * 0.45, z: ob.z + fwd.z * 0.45 }; b.slide = null; return ev; }
     }
   }
 
@@ -123,7 +124,7 @@ export function stepGround(b, input, dt, now, cfg, geo, opts = {}) {
   b.vel.y -= m.gravity * dt;
   b.pos.x += b.vel.x * dt; b.pos.z += b.vel.z * dt; b.pos.y += b.vel.y * dt;
   geo.resolve(b);
-  const g = geo.groundHeight(b.pos.x, b.pos.z, b.pos.y - b.vel.y * dt);
+  const g = geo.groundHeight(b.pos.x, b.pos.z, b.pos.y - b.vel.y * dt, FOOT_R);
   if (b.pos.y <= g) { if (!b.grounded && b.vel.y < -2) ev.landed = true; b.pos.y = g; b.vel.y = 0; b.grounded = true; }
   else if (b.pos.y > g + 0.05) b.grounded = false;
   clampToMap(b, cfg);
@@ -156,7 +157,7 @@ export function stepCrawl(b, input, dt, speed, cfg, geo) {
   b.stance = 'prone'; b.vel.x = w.x * speed; b.vel.z = w.z * speed;
   b.pos.x += b.vel.x * dt; b.pos.z += b.vel.z * dt;
   geo.resolve(b); clampToMap(b, cfg);
-  b.pos.y = geo.groundHeight(b.pos.x, b.pos.z, b.pos.y);
+  b.pos.y = geo.groundHeight(b.pos.x, b.pos.z, b.pos.y, FOOT_R);
 }
 
 export function clampToMap(b, cfg) { const h = cfg.map.size / 2 - 1; b.pos.x = clamp(b.pos.x, -h, h); b.pos.z = clamp(b.pos.z, -h, h); }

@@ -10,6 +10,7 @@ export const C2S = {
   RELOAD: 'reload',
   SWITCH: 'switch',       // { slot: 'primary'|'secondary' }
   PICKUP: 'pickup',       // { lootId }
+  CHEST: 'chest',         // { chestId }  abrir baú (ação com tempo)
   USE_PLATE: 'usePlate',
   USE_HEAL: 'useHeal',
   THROW: 'throw',         // { yaw, pitch }

@@ -16,7 +16,8 @@ export function createMatch(overrides = {}, seed = 42) {
   for (const w of Object.values(cfg.weapons)) { w.spreadHip = 0; w.spreadAds = 0; }
   cfg.map.size = 420;
   const m = new Match({ cfg, seed, logger: new Logger('test', process.env.LOG_LEVEL || 'silent') });
-  m.ctx.map.boxes = [];                 // mapa limpo: testes de combate sem paredes
+  const map = m.ctx.map;                // mapa limpo e plano: testes de combate sem paredes
+  map.boxes = []; map.terrain = null; map.buildIndex(); map.lootSpots = []; map.chestSpots = [];
   return m;
 }
 function deepMerge(a, b) { const o = structuredClone(a); for (const k in b) o[k] = (b[k] && typeof b[k] === 'object' && !Array.isArray(b[k])) ? deepMerge(o[k] ?? {}, b[k]) : b[k]; return o; }

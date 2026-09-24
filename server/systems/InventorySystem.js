@@ -9,7 +9,7 @@ import { PS } from '../Player.js';
 export class InventorySystem {
   constructor(ctx) { this.ctx = ctx; }
 
-  weapon(id) { const w = this.ctx.cfg.weapons[id]; return w && { id, mag: w.mag, nextFireAt: 0 }; }
+  weapon(id, rarity = 'common') { const w = this.ctx.cfg.weapons[id]; return w && { id, rarity, mag: Math.round(w.mag * (this.ctx.cfg.rarity?.[rarity]?.mag ?? 1)), nextFireAt: 0 }; }
 
   init(p, kind) {
     const cfg = this.ctx.cfg, kit = kind === 'respawn' ? cfg.resurgence.basicKit : null;
@@ -19,6 +19,7 @@ export class InventorySystem {
       plates: kit ? kit.plates : cfg.health.plates.startPlates,
       heals: kit ? 0 : 1,
       lethal: kit ? kit.lethal : 1,
+      tactical: kit ? 0 : 1,
       cash: p.inv?.cash ?? 0,              // dinheiro é mantido entre vidas
     };
     if (kit) for (const w of kit.weapons) this.giveWeapon(p, w);
@@ -26,13 +27,14 @@ export class InventorySystem {
     p.action = null;
   }
 
+  magSize(w) { return Math.round(this.ctx.cfg.weapons[w.id].mag * (this.ctx.cfg.rarity?.[w.rarity]?.mag ?? 1)); }
   active(p) { return p.inv?.[p.inv.active] ?? null; }
 
   /** Coloca a arma no slot dela; devolve a arma antiga (vira loot no chão). */
-  giveWeapon(p, id, mag) {
+  giveWeapon(p, id, mag, rarity = 'common') {
     const def = this.ctx.cfg.weapons[id]; if (!def) return null;
     const slot = def.slot, old = p.inv[slot];
-    p.inv[slot] = this.weapon(id); if (mag !== undefined) p.inv[slot].mag = mag;
+    p.inv[slot] = this.weapon(id, rarity); if (mag !== undefined) p.inv[slot].mag = mag;
     p.inv.active = slot; this.cancelAction(p, 'reload');
     return old;
   }
@@ -55,7 +57,7 @@ export class InventorySystem {
   requestReload(p) {
     const w = this.active(p); if (!w || !p.is(PS.ALIVE)) return;
     const def = this.ctx.cfg.weapons[w.id];
-    if (w.mag >= def.mag || !p.inv.ammo[def.ammo]) return;
+    if (w.mag >= this.magSize(w) || !p.inv.ammo[def.ammo]) return;
     this.startAction(p, 'reload', def.reload, { slow: 0.8 });
   }
   requestSwitch(p, slot) {
@@ -79,10 +81,11 @@ export class InventorySystem {
       const a = p.action; if (!a) continue;
       if (!p.is(PS.ALIVE)) { p.action = null; continue; }
       if (a.type === 'revive') continue;              // concluída pelo HealthSystem
+      if (a.type === 'chest') { if (now >= a.until) { p.action = null; this.ctx.systems.loot.openChest(p, a.chestId); } continue; }
       if (now < a.until) continue;
       p.action = null;
       if (a.type === 'reload') {
-        const w = this.active(p), def = this.ctx.cfg.weapons[w.id], take = Math.min(def.mag - w.mag, p.inv.ammo[def.ammo]);
+        const w = this.active(p), def = this.ctx.cfg.weapons[w.id], take = Math.min(this.magSize(w) - w.mag, p.inv.ammo[def.ammo]);
         w.mag += take; p.inv.ammo[def.ammo] -= take;
       } else if (a.type === 'plate') {
         p.inv.plates--; this.ctx.systems.armor.applyPlate(p);
@@ -96,7 +99,7 @@ export class InventorySystem {
   /** Itens que caem ao morrer. */
   dropList(p) {
     const out = [];
-    for (const slot of ['primary', 'secondary']) if (p.inv[slot] && p.inv[slot].id !== 'sidearm') out.push({ type: 'weapon', data: { id: p.inv[slot].id, mag: p.inv[slot].mag } });
+    for (const slot of ['primary', 'secondary']) if (p.inv[slot] && p.inv[slot].id !== 'sidearm') out.push({ type: 'weapon', data: { id: p.inv[slot].id, mag: p.inv[slot].mag, rarity: p.inv[slot].rarity ?? 'common' } });
     for (const [t, n] of Object.entries(p.inv.ammo)) if (n > 0) out.push({ type: 'ammo', data: { ammo: t, amount: n } });
     if (p.inv.plates > 0) out.push({ type: 'plate', data: { amount: p.inv.plates } });
     const cash = Math.floor(p.inv.cash / 2);

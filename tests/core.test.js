@@ -110,7 +110,7 @@ test('dano cai com a distância e parede bloqueia', () => {
   const W = m.ctx.systems.weapons, def = m.ctx.cfg.weapons.rifle;
   assert.equal(W.falloff(def, 10), 1); assert.ok(W.falloff(def, 120) < 0.85);
   place(a, 0, 0); place(b, 0, -20);
-  m.ctx.map.boxes.push({ minX: -3, maxX: 3, minZ: -11, maxZ: -9, h: 5 });
+  m.ctx.map.addBox({ minX: -3, maxX: 3, minZ: -11, maxZ: -9, h: 5 });
   m.ctx.systems.inventory.giveWeapon(a, 'rifle', 30);
   m.handle(a, { t: 'fire', ...aim(a, b, 1.2) }); m.tick(DT);
   assert.equal(b.hp, 100);

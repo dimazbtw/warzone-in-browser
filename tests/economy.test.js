@@ -104,11 +104,11 @@ test('inteligência: itens exclusivos do squad; coletar todos conclui', () => {
 });
 
 test('resistência + contrato expira', () => {
-  const { m, ps: [a, , c], S } = setup({ contracts: { types: { survive: { time: 2, duration: 60 }, hunt: { duration: 1 } } } });
+  const { m, ps: [a, b, c], S } = setup({ contracts: { types: { survive: { time: 2, duration: 60 }, hunt: { duration: 1 } } } });
   const failed = []; m.bus.on('contractFailed', e => failed.push(e.reason));
   const bd = toBoard(m, a, 'survive'); m.handle(a, { t: 'contract', boardId: bd.id });
   run(m, 2.2); assert.equal(a.stats.contracts, 1);
-  const bd2 = toBoard(m, c, 'hunt'); m.handle(c, { t: 'contract', boardId: bd2.id });
+  const bd2 = toBoard(m, c, 'hunt'); place(b, bd2.x + 20, bd2.z); m.handle(c, { t: 'contract', boardId: bd2.id });
   run(m, 1.2); assert.equal(failed.at(-1), 'tempo esgotado');
 });
 

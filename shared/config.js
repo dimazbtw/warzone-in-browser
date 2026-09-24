@@ -113,9 +113,20 @@ export const CONFIG = {
     marksman:{ name: 'Harpia DMR',  slot: 'primary',   ammo: 'sniper', damage: 95, rpm: 60,  mag: 5,  reserve: 20,  reload: 2.8, range: 400, falloff: [[150, 1], [400, 0.9]], spreadHip: 0.08, spreadAds: 0.0008, recoil: 3.0, projectileSpeed: 900, rarity: 'epic', headMultiplier: 2.4 },
   },
 
+  // ---------------- RARIDADE = ACESSÓRIOS ----------------
+  // multiplicadores aplicados às armas por raridade (pente, dispersão, recuo, dano, recarga, alcance)
+  rarity: {
+    common:    { mag: 1.0,  spread: 1.0,  recoil: 1.0,  damage: 1.0,  reload: 1.0,  range: 1.0,  label: 'Comum' },
+    uncommon:  { mag: 1.2,  spread: 0.92, recoil: 0.92, damage: 1.0,  reload: 0.95, range: 1.05, label: 'Incomum' },
+    rare:      { mag: 1.35, spread: 0.82, recoil: 0.82, damage: 1.03, reload: 0.9,  range: 1.12, label: 'Rara' },
+    epic:      { mag: 1.5,  spread: 0.72, recoil: 0.72, damage: 1.06, reload: 0.82, range: 1.2,  label: 'Épica' },
+    legendary: { mag: 1.7,  spread: 0.6,  recoil: 0.6,  damage: 1.1,  reload: 0.75, range: 1.3,  label: 'Lendária' },
+  },
+
   // ---------------- LOOT ----------------
   loot: {
-    spawnPoints: 180,
+    spawnPoints: 320,
+    chestRange: 2.4, chestTime: 0.7,
     pickupRange: 2.5,
     autoPickup: { enabled: true, types: ['cash', 'ammo', 'plate'], radius: 1.4 },
     rarityWeights: { common: 50, uncommon: 30, rare: 14, epic: 5, legendary: 1 },
@@ -127,6 +138,7 @@ export const CONFIG = {
       { weight: 14, type: 'cash' },
       { weight: 7,  type: 'heal' },
       { weight: 6,  type: 'lethal' },
+      { weight: 5,  type: 'tactical' },
     ],
     ammoPack: { pistol: 28, rifle: 30, shell: 8, sniper: 5 },
     cashRange: [100, 800],
@@ -137,6 +149,8 @@ export const CONFIG = {
   // ---------------- EQUIPAMENTO ----------------
   equipment: {
     lethal: { name: 'Granada de Fragmentação', fuse: 2.2, radius: 8, maxDamage: 140, maxCarried: 2, throwSpeed: 19 },
+    tactical: { name: 'Granada de Fumaça', fuse: 1.2, radius: 7, duration: 16, maxCarried: 2, throwSpeed: 17 },
+    melee: { name: 'Faca', damage: 60, range: 2.2, cooldown: 0.8, arc: 0.9 },
   },
 
   // ---------------- CONTRATOS (objetivos opcionais) ----------------
@@ -190,7 +204,7 @@ export function clientConfig(cfg = CONFIG) {
     health: cfg.health,
     downed: cfg.downed,
     resurgence: { enabled: cfg.resurgence.enabled, disableAtPhase: cfg.resurgence.disableAtPhase },
-    contracts: cfg.contracts, stations: cfg.stations, loot: { pickupRange: cfg.loot.pickupRange },
+    contracts: cfg.contracts, stations: cfg.stations, loot: { pickupRange: cfg.loot.pickupRange, chestRange: cfg.loot.chestRange }, rarity: cfg.rarity, equipment: cfg.equipment,
     weapons: cfg.weapons,
     network: { interpolationDelay: cfg.network.interpolationDelay },
   };
