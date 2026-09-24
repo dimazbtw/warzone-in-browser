@@ -8,7 +8,15 @@ export class AudioSystem {
     if (this.ctx) { this.ctx.resume(); if (this.wantMusic && !this.musicTimer) this.menuMusic(true); return; }
     const C = window.AudioContext || window.webkitAudioContext; if (!C) return;
     this.ctx = new C(); this.master = this.ctx.createGain(); this.master.gain.value = this.volume * (this.sfx ?? 1); this.master.connect(this.ctx.destination);
+    this.buildReverb();
     const n = this.ctx.sampleRate; this.noise = this.ctx.createBuffer(1, n, n); const d = this.noise.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1;
+  }
+  /** Reverb por convolução com resposta ao impulso sintetizada (cauda de ~1.6 s). */
+  buildReverb() {
+    const c = this.ctx, len = c.sampleRate * 1.6, ir = c.createBuffer(2, len, c.sampleRate);
+    for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
+    this.verb = c.createConvolver(); this.verb.buffer = ir; this.verbGain = c.createGain(); this.verbGain.gain.value = 0.22;
+    this.verb.connect(this.verbGain).connect(this.master);
   }
   setVolumes(master, sfx, music) {
     this.volume = master; this.sfx = sfx; this.musicVol = music;
@@ -40,6 +48,7 @@ export class AudioSystem {
     }
   }
   listener(pos, yaw) {
+    this.lp = { x: pos.x, z: pos.z };
     if (!this.ctx) return; const L = this.ctx.listener, t = this.ctx.currentTime;
     if (L.positionX) { L.positionX.setValueAtTime(pos.x, t); L.positionY.setValueAtTime(pos.y, t); L.positionZ.setValueAtTime(pos.z, t);
       L.forwardX.setValueAtTime(-Math.sin(yaw), t); L.forwardY.setValueAtTime(0, t); L.forwardZ.setValueAtTime(-Math.cos(yaw), t); L.upY.setValueAtTime(1, t); }
@@ -49,22 +58,41 @@ export class AudioSystem {
     const p = this.ctx.createPanner(); p.panningModel = 'HRTF'; p.distanceModel = 'inverse'; p.refDistance = 4; p.maxDistance = 400; p.rolloffFactor = 1.1;
     p.positionX.value = pos.x; p.positionY.value = pos.y ?? 1; p.positionZ.value = pos.z; p.connect(this.master); return p;
   }
-  burst({ freq = 1200, len = 0.18, vol = 0.6, type = 'lowpass', pos } = {}) {
-    if (!this.ctx) return; const c = this.ctx, s = c.createBufferSource(); s.buffer = this.noise;
-    const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq;
-    const g = c.createGain(); g.gain.setValueAtTime(vol, c.currentTime); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + len);
-    s.connect(f).connect(g).connect(this.out(pos)); s.start(); s.stop(c.currentTime + len);
+  burst({ freq = 1200, len = 0.18, vol = 0.6, type = 'lowpass', pos, verb = 0, q = 0.7, attack = 0, delay = 0 } = {}) {
+    if (!this.ctx) return; const c = this.ctx, s = c.createBufferSource(), t = c.currentTime + delay; s.buffer = this.noise;
+    s.playbackRate.value = 0.8 + Math.random() * 0.4;
+    const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+    const g = c.createGain();
+    if (attack) { g.gain.setValueAtTime(0.0001, t); g.gain.linearRampToValueAtTime(vol, t + attack); } else g.gain.setValueAtTime(vol, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + len);
+    const out = this.out(pos); s.connect(f).connect(g).connect(out);
+    if (verb && this.verb) { const vg = c.createGain(); vg.gain.value = verb; g.connect(vg).connect(this.verb); }
+    s.start(t, Math.random() * 0.5); s.stop(t + len + 0.05);
   }
+  dist(pos) { return pos && this.lp ? Math.hypot(pos.x - this.lp.x, pos.z - this.lp.z) : 0; }
   tone(freq, len, vol = 0.12, type = 'square', pos) {
     if (!this.ctx) return; const c = this.ctx, o = c.createOscillator(); o.type = type; o.frequency.value = freq;
     const g = c.createGain(); g.gain.setValueAtTime(vol, c.currentTime); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + len);
     o.connect(g).connect(this.out(pos)); o.start(); o.stop(c.currentTime + len);
   }
+  /** Tiro em camadas: estalo (transiente), corpo, grave e cauda com reverb; distância abafa os agudos. */
   shot(weapon, pos, local = false) {
-    const p = { sidearm: [1600, 0.14], rifle: [1300, 0.18], battle: [900, 0.24], smg: [1800, 0.12], shotgun: [600, 0.35], marksman: [500, 0.55] }[weapon] ?? [1200, 0.18];
-    this.burst({ freq: p[0], len: p[1], vol: local ? 0.5 : 0.9, pos: local ? null : pos });
-    if (!local) this.burst({ freq: 300, len: p[1] * 2, vol: 0.25, pos });
+    const p = { sidearm: [1700, 0.12, 0.7], rifle: [1400, 0.16, 1], battle: [1000, 0.22, 1.2], smg: [1900, 0.1, 0.8], shotgun: [700, 0.3, 1.5], marksman: [600, 0.45, 1.6] }[weapon] ?? [1200, 0.16, 1];
+    const d = local ? 0 : this.dist(pos), far = Math.min(1, d / 180), P = local ? null : pos;
+    const v = local ? 0.55 : 0.95;
+    this.burst({ freq: 4200 * (1 - far * 0.85), len: 0.035, vol: v * 0.9 * (1 - far * 0.7), type: 'highpass', pos: P });
+    this.burst({ freq: p[0] * (1 - far * 0.6), len: p[1], vol: v, pos: P, verb: 0.5 + far * 0.8 });
+    this.burst({ freq: 140, len: p[1] * 1.8, vol: v * 0.7 * p[2], pos: P, q: 1.2 });
+    if (local) this.tone(70, 0.08, 0.18, 'sine');
+    if (far > 0.3) this.burst({ freq: 380, len: 0.9, vol: 0.25 * far, pos: P, delay: 0.06, verb: 0.8 });
   }
+  /** Passo: terra (grave, arenoso) ou piso duro (clique). */
+  step(pos, vol = 0.6, surface = 'dirt') {
+    if (surface === 'hard') { this.burst({ freq: 1800, len: 0.04, vol: 0.14 * vol, type: 'bandpass', q: 2, pos }); this.burst({ freq: 300, len: 0.06, vol: 0.12 * vol, pos }); }
+    else { this.burst({ freq: 700, len: 0.09, vol: 0.16 * vol, type: 'bandpass', q: 0.8, pos, attack: 0.01 }); this.burst({ freq: 200, len: 0.07, vol: 0.1 * vol, pos }); }
+  }
+  land(speed) { const k = Math.min(1, speed / 12); this.burst({ freq: 260, len: 0.18, vol: 0.3 + 0.4 * k }); this.burst({ freq: 900, len: 0.06, vol: 0.15 + 0.2 * k, type: 'bandpass' }); }
+  reloadClick(stage) { this.tone(stage ? 1500 : 900, 0.03, 0.06, 'square'); this.burst({ freq: 2500, len: 0.03, vol: 0.12, type: 'highpass' }); }
   hit(head) { this.tone(head ? 2200 : 1700, 0.05, 0.09); }
   kill() { this.tone(1200, 0.08, 0.12); setTimeout(() => this.tone(1600, 0.12, 0.12), 70); }
   crack() { this.tone(2600, 0.1, 0.08, 'triangle'); }
@@ -72,7 +100,6 @@ export class AudioSystem {
   ui() { this.tone(900, 0.04, 0.05, 'sine'); }
   cash() { this.tone(1400, 0.06, 0.06, 'sine'); setTimeout(() => this.tone(1900, 0.08, 0.06, 'sine'), 60); }
   warn() { this.tone(440, 0.25, 0.08, 'sawtooth'); }
-  step(pos) { this.burst({ freq: 400, len: 0.05, vol: 0.12, pos }); }
   setWind(on, strength = 1) {
     if (!this.ctx) return;
     if (on && !this.wind) { const s = this.ctx.createBufferSource(); s.buffer = this.noise; s.loop = true; const f = this.ctx.createBiquadFilter(); f.type = 'bandpass'; f.frequency.value = 500; const g = this.ctx.createGain(); g.gain.value = 0.15 * strength; s.connect(f).connect(g).connect(this.master); s.start(); this.wind = { s, g }; }

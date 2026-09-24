@@ -4,6 +4,7 @@ import { assets } from '../../assets/AssetManager.js';
 import { Rig } from './Rig.js';
 import { Animator } from './Animator.js';
 import { buildFallbackHumanoid } from './FallbackHumanoid.js';
+import { realGun } from '../RealWeapons.js';
 import { gunModel, OPERATOR_STYLES, nameplate } from '../Models.js';
 import { operatorOf } from '../../core/Operators.js';
 
@@ -59,7 +60,7 @@ export class CharacterFactory {
     const c = { root, rig, animator, weapon, real, weaponId: null, plate: null };
     c.setWeapon = id => {
       if (c.weaponId === id) return; c.weaponId = id; weapon.clear();
-      if (id) { const g = gunModel(id); g.traverse(o => { if (o.isMesh) o.castShadow = true; }); weapon.add(g); }
+      if (id) { const g = realGun(id) || gunModel(id); g.traverse(o => { if (o.isMesh) o.castShadow = true; }); weapon.add(g); }
     };
     if (ally && name) { c.plate = nameplate(name); c.plate.position.y = 2.25; root.add(c.plate); }
     return c;

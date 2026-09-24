@@ -45,7 +45,7 @@ export class InputSystem extends EventTarget {
       if (document.pointerLockElement !== canvas || !this.enabled) return;
       const s = settings.get('sensitivity') * (this.aiming ? settings.get('adsSensitivity') : 1) * this.zoomScale;
       const dx = Math.max(-400, Math.min(400, e.movementX)), dy = Math.max(-400, Math.min(400, e.movementY));
-      this.mouseDX += dx; this.mouseDY += dy;
+      this.mouseDX += dx; this.mouseDY += dy; this.lastDX = (this.lastDX ?? 0) + dx; this.lastDY = (this.lastDY ?? 0) + dy;
       this.yaw -= dx * s; this.pitch = Math.max(-1.5, Math.min(1.5, this.pitch - dy * s * (settings.get('invertY') ? -1 : 1)));
     });
     addEventListener('wheel', () => { if (this.enabled) this.emit('swap'); }, { passive: true });

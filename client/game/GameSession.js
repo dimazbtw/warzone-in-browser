@@ -12,6 +12,7 @@ import { settings } from '../core/Settings.js';
 
 const $ = id => document.getElementById(id);
 const STEP = 1 / 30;
+const PATTERN_SEED = { rifle: 0.3, battle: 1.7, smg: 2.9, sidearm: 4.1, shotgun: 0, marksman: 0 };
 const AUTO = new Set(['rifle', 'smg']);
 const ACTION_OPTS = { reload: { slow: 0.8 }, plate: { slow: 0.6, blocksAds: true }, heal: {}, revive: { slow: 0, blocksAds: true } };
 const EYE = { stand: 1.6, crouch: 1.1, prone: 0.45 };
@@ -209,7 +210,11 @@ export class GameSession {
     const cam = this.world.camera, o = cam.getWorldPosition(new THREE.Vector3()), d = cam.getWorldDirection(new THREE.Vector3());
     const wall = this.geo.raycast(o, d, def.range), end = o.clone().addScaledVector(d, wall ?? def.range);
     this.effects.tracer(o.clone().addScaledVector(d, 1.2).add(new THREE.Vector3(0, -0.12, 0)), end); if (wall) this.effects.spark(end);
-    this.input.pitch = Math.min(1.5, this.input.pitch + def.recoil * 0.008 * (y.ads ? 0.6 : 1)); this.input.yaw += (Math.random() - 0.5) * def.recoil * 0.004;
+    // padrão de recuo determinístico por arma (sobe, depois deriva para os lados), escalado pela raridade
+    const n = this.recoilShots = (this.recoilShots ?? 0) + 1, rm = (this.cfg.rarity?.[w.rarity]?.recoil ?? 1) * def.recoil * (y.ads ? 0.6 : 1) * (y.st === 'crouch' ? 0.8 : y.st === 'prone' ? 0.6 : 1);
+    const up = 0.0075 * rm * (1 + Math.min(n, 12) / 12 * 0.6), side = (Math.sin(n * 0.55 + (PATTERN_SEED[w.id] ?? 0)) * 0.6 + (Math.random() - 0.5) * 0.5) * 0.0035 * rm;
+    this.input.pitch = Math.min(1.5, this.input.pitch + up); this.input.yaw += side;
+    this.recoilDebt = Math.min(0.2, (this.recoilDebt ?? 0) + up * 0.65); this.camKick = (this.camKick ?? 0) + up * 0.6;
   }
 
   // ------------------------------------------------------------ frame
@@ -223,12 +228,22 @@ export class GameSession {
       const inp = input.sample(++this.seq, STEP);
       if (this.shopOpen || !input.enabled) Object.assign(inp, { mx: 0, mz: 0, jump: false, sprint: false });
       this.net.send(C2S.INPUT, inp);
+      const b0 = this.pred.body, wasG = b0.grounded, vy = b0.vel.y;
       this.pred.step(inp, STEP, serverNow, ACTION_OPTS[y.action?.type] ?? {});
+      if (!wasG && b0.grounded && vy < -3 && y.s === 'alive') this.onLand(-vy);
     }
+    if (!input.fire) this.recoilShots = Math.max(0, (this.recoilShots ?? 0) - dt * 12);
+    // recuperação do recuo: devolve parte da subida acumulada quando para de atirar
+    if (this.recoilDebt > 0 && !input.fire) { const r = Math.min(this.recoilDebt, dt * 1.6 * Math.max(0.05, this.recoilDebt * 6)); input.pitch -= r; this.recoilDebt -= r; }
     if (input.fire) this.tryFire(false);
 
     const others = this.interp.sample(serverNow);
     this.avatars.update(others, dt, this.world.camera.position);
+    this.remoteSteps(others, dt);
+    // estalos da recarga nos pontos da animação (tira / coloca o carregador)
+    const ac = y.action;
+    if (ac?.type === 'reload' && ac.total) { const k = 1 - ac.left / ac.total; for (const [i, at] of [[0, 0.3], [1, 0.84]]) if (k >= at && !(this.reloadMarks ??= [])[i]) { this.reloadMarks[i] = true; this.audio.reloadClick(i); } }
+    else this.reloadMarks = [];
     const pos = this.pred.renderPos(this.acc / STEP, dt), body = this.pred.body;
     const inv = y.inv, w = inv?.[inv.active];
 
@@ -249,7 +264,18 @@ export class GameSession {
       cam.position.set(target.x + Math.cos(time * 0.1) * 120, 120, target.z + Math.sin(time * 0.1) * 120); cam.lookAt(target.x, 0, target.z);
     } else {
       const eye = st === 'downed' ? 0.5 : body.slide ? 0.9 : EYE[body.stance] ?? 1.6;
-      cam.position.set(pos.x, pos.y + eye, pos.z); cam.rotation.set(input.pitch, input.yaw, 0, 'YXZ');
+      // sensação de câmera: bob do passo, inclinação no strafe/slide, afundada do pouso, tranco do tiro
+      const sp = Math.hypot(body.vel.x, body.vel.z), moving = body.grounded && sp > 1 && !body.slide;
+      this.bobT = (this.bobT ?? 0) + (moving ? dt * (body.sprinting ? 12.5 : 8.5) : 0);
+      const bobA = moving ? Math.min(1, sp / 5) * (y.ads ? 0.25 : 1) * (body.sprinting ? 0.05 : 0.028) : 0;
+      const side = body.vel.x * Math.cos(input.yaw) - body.vel.z * Math.sin(input.yaw);
+      this.roll ??= 0; this.roll += ((-side * 0.006 + (body.slide ? 0.06 : 0) + (moving ? Math.sin(this.bobT) * bobA * 0.15 : 0)) - this.roll) * Math.min(1, dt * 8);
+      this.landDip = (this.landDip ?? 0) * Math.max(0, 1 - dt * 7); this.camKick = (this.camKick ?? 0) * Math.max(0, 1 - dt * 14);
+      this.eyeS = (this.eyeS ?? eye) + (eye - (this.eyeS ?? eye)) * Math.min(1, dt * 12);   // agachar/levantar suave
+      cam.position.set(pos.x + Math.cos(input.yaw) * Math.sin(this.bobT * 0.5) * bobA * 0.6, pos.y + this.eyeS - Math.abs(Math.sin(this.bobT)) * bobA - this.landDip, pos.z - Math.sin(input.yaw) * Math.sin(this.bobT * 0.5) * bobA * 0.6);
+      cam.rotation.set(input.pitch + this.camKick, input.yaw, this.roll, 'YXZ');
+      // passos locais
+      if (moving && body.stance !== 'prone') { this.stepAcc = (this.stepAcc ?? 0) + sp * dt; const stride = body.sprinting ? 2.4 : 1.9; if (this.stepAcc > stride) { this.stepAcc = 0; this.audio.step(null, body.sprinting ? 1 : body.stance === 'crouch' ? 0.3 : 0.6, this.surfaceAt(pos)); } }
     }
     if (window.DEBUG_CAM) { const d = window.DEBUG_CAM; cam.position.set(d.x, d.y, d.z); cam.rotation.set(d.pitch ?? 0, d.yaw ?? 0, 0, 'YXZ'); }   // câmera livre de depuração
     if (this.shake > 0) { cam.position.x += (Math.random() - 0.5) * this.shake; cam.position.y += (Math.random() - 0.5) * this.shake; this.shake = Math.max(0, this.shake - dt * 1.5); }
@@ -266,7 +292,9 @@ export class GameSession {
     }
 
     this.vm.setWeapon(st === 'alive' ? w?.id ?? null : null);
-    this.vm.update(dt, { ads: y.ads, sprint: body.sprinting, moving: Math.hypot(body.vel.x, body.vel.z) > 1 && body.grounded, action: y.action?.type, visible: st === 'alive', sniperScope: sniper });
+    this.vm.update(dt, { ads: y.ads, sprint: body.sprinting, moving: Math.hypot(body.vel.x, body.vel.z) > 1 && body.grounded, speed: Math.hypot(body.vel.x, body.vel.z), slide: !!body.slide, grounded: body.grounded,
+      action: y.action?.type, actionTime: y.action?.total, mouseDX: input.lastDX ?? 0, mouseDY: input.lastDY ?? 0, visible: st === 'alive', sniperScope: sniper });
+    input.lastDX = input.lastDY = 0;
 
     this.audio.listener(cam.position, input.yaw); this.audio.setWind(st === 'freefall' || st === 'parachute', st === 'freefall' ? 1.4 : 0.6);
 
@@ -286,6 +314,25 @@ export class GameSession {
     world.update(dt, this.snap, cam.position, time);
     this.effects.update(dt);
     world.render();
+  }
+  /** Passos de outros jogadores (só perto, andando sem agachar) — ouvir é informação tática. */
+  remoteSteps(others, dt) {
+    const me = this.pred.body.pos; this.stepMap ??= new Map();
+    for (const o of others) {
+      if (o.s !== 'alive' || o.gr === 0 || o.st !== 'stand') continue;
+      const d = Math.hypot(o.x - me.x, o.z - me.z); if (d > 32) continue;
+      const sp = Math.hypot(o.vx ?? 0, o.vz ?? 0); if (sp < 2.5) continue;
+      const a = (this.stepMap.get(o.id) ?? 0) + sp * dt;
+      if (a > (o.spr ? 2.4 : 1.9)) { this.stepMap.set(o.id, 0); this.audio.step({ x: o.x, y: o.y, z: o.z }, o.spr ? 1.4 : 1, o.y > (this.geo?.terrain?.heightAt(o.x, o.z) ?? 0) + 0.3 ? 'hard' : 'dirt'); }
+      else this.stepMap.set(o.id, a);
+    }
+  }
+  onLand(speed) { this.vm.landed(speed); this.landDip = Math.min(0.28, speed * 0.022); this.audio.land(speed); }
+  /** Superfície sob o jogador para o som do passo. */
+  surfaceAt(p) {
+    const g = this.geo; if (!g) return 'dirt';
+    const t = g.terrain ? g.terrain.heightAt(p.x, p.z) : 0;
+    return p.y > t + 0.3 ? 'hard' : 'dirt';
   }
   promptText() {
     const p = this.pred.body.pos;

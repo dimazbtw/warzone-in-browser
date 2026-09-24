@@ -1,11 +1,23 @@
 import * as THREE from 'three';
 import { gunModel, armsModel, OPERATOR_STYLES } from './Models.js';
+import { realGun, hasRealGun } from './RealWeapons.js';
 
-/** ViewModel — arma + braços em primeira pessoa com bob, sway, recuo e animações de ação. */
+/**
+ * ViewModel — arma + braços em primeira pessoa.
+ *   - fuzil GLB real (Higgsfield) quando carregado, senão o procedural
+ *   - recuo com mola (posição + rotação), sway do mouse, bob do passo
+ *   - animações: sacar, recarga (3 fases), placa, cura, reviver, sprint, slide, pouso
+ */
+const spring = (s, target, k, d, dt) => { const a = (target - s.x) * k - s.v * d; s.v += a * dt; s.x += s.v * dt; return s.x; };
+const smooth = t => t * t * (3 - 2 * t);
+
 export class ViewModel {
   constructor(camera) {
     this.root = new THREE.Group(); this.root.scale.setScalar(0.62); camera.add(this.root);
-    this.weaponId = null; this.kick = 0; this.swayX = 0; this.swayY = 0; this.bob = 0;
+    this.gun = null; this.arms = null; this.left = null; this.leftRest = new THREE.Vector3(); this.leftRot = new THREE.Euler();
+    this.weaponId = null; this.swayX = 0; this.swayY = 0; this.bob = 0; this.t = 0;
+    this.kz = { x: 0, v: 0 }; this.kr = { x: 0, v: 0 }; this.ky = { x: 0, v: 0 }; this.land = { x: 0, v: 0 };
+    this.drawT = 1; this.actionT = 0; this.lastAction = null; this.adsK = 0; this.sprintK = 0; this.slideK = 0; this.fireRoll = 0;
     const flashMat = new THREE.MeshBasicMaterial({ color: 0xffc070, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
     this.flash = new THREE.Group();
     for (let i = 0; i < 3; i++) { const p = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.1), flashMat); p.rotation.z = i * Math.PI / 3; this.flash.add(p); }
@@ -13,29 +25,84 @@ export class ViewModel {
     this.style = OPERATOR_STYLES[0];
   }
   setWeapon(id, style = this.style) {
-    if (id === this.weaponId && style === this.style) return;
-    this.weaponId = id; this.style = style; this.root.clear();
+    const upgrade = id && this.gun && !this.gun.userData.real && hasRealGun(id);   // GLB chegou depois
+    if (id === this.weaponId && style === this.style && !upgrade) return;
+    this.weaponId = id; this.style = style; this.root.clear(); this.gun = null;
     if (!id) return;
-    const gun = gunModel(id), arms = armsModel(style);
-    arms.userData.left.position.z = id === 'sidearm' ? -0.02 : -Math.min(0.42, gun.userData.L * 0.5);
-    if (id === 'sidearm') { arms.userData.left.position.set(-0.03, -0.12, -0.02); arms.userData.left.rotation.set(0.3, -0.2, -0.9); }
+    const gun = realGun(id) || gunModel(id), arms = armsModel(style);
+    const left = arms.userData.left;
+    left.position.z = id === 'sidearm' ? -0.02 : -Math.min(0.42, gun.userData.L * 0.5);
+    if (id === 'sidearm') { left.position.set(-0.03, -0.12, -0.02); left.rotation.set(0.3, -0.2, -0.9); }
+    this.leftRest.copy(left.position); this.leftRot.copy(left.rotation);
     this.flash.position.set(0, 0.02, gun.userData.muzzleZ - 0.05); this.light.position.copy(this.flash.position);
     this.root.add(gun, arms, this.flash, this.light); this.flash.visible = false;
+    this.gun = gun; this.arms = arms; this.left = left; this.drawT = 0;
   }
-  fire(recoil = 1) { this.kick = Math.min(0.12, this.kick + 0.045 * recoil); this.flashT = 0.045; this.flash.rotation.z = Math.random() * 3; this.flash.scale.setScalar(0.8 + Math.random() * 0.6); }
+  fire(recoil = 1) {
+    this.kz.v += 1.6 * recoil; this.kr.v += 9 * recoil; this.ky.v += (Math.random() - 0.5) * 3 * recoil; this.fireRoll = (Math.random() - 0.5) * 0.04 * recoil;
+    this.flashT = 0.045; this.flash.rotation.z = Math.random() * 3; this.flash.scale.setScalar(0.8 + Math.random() * 0.6);
+  }
+  /** Impacto de pouso (velocidade vertical em m/s). */
+  landed(speed) { this.land.v -= Math.min(4, speed * 0.25); }
 
-  update(dt, { ads, sprint, moving, action, mouseDX = 0, mouseDY = 0, visible, sniperScope }) {
-    this.root.visible = visible && !sniperScope;
+  update(dt, { ads, sprint, moving, speed = 0, slide, grounded = true, action, actionTime = 1, mouseDX = 0, mouseDY = 0, visible, sniperScope }) {
+    this.t += dt;
+    this.root.visible = visible && !sniperScope && !!this.gun;
     this.flashT -= dt; this.flash.visible = this.flashT > 0; this.light.intensity = this.flashT > 0 ? 6 : 0;
-    this.kick = Math.max(0, this.kick - dt * 0.6);
-    this.swayX += (-mouseDX * 0.002 - this.swayX) * Math.min(1, dt * 8); this.swayY += (mouseDY * 0.002 - this.swayY) * Math.min(1, dt * 8);
-    if (moving) this.bob += dt * (sprint ? 13 : 8);
-    const b = moving ? Math.sin(this.bob) * (sprint ? 0.02 : 0.01) : 0;
-    const target = ads ? [0, -0.12, -0.3] : sprint ? [0.28, -0.3, -0.3] : [0.22, -0.22, -0.4];
-    const k = Math.min(1, dt * 14), p = this.root.position;
-    p.x += (target[0] + b + this.swayX - p.x) * k; p.y += (target[1] + Math.abs(b) + this.swayY - p.y) * k; p.z += (target[2] + this.kick - p.z) * k;
-    const rx = action === 'reload' ? -0.55 : action === 'plate' ? -1.0 : action === 'heal' ? -0.8 : action === 'revive' ? -1.2 : this.kick * 1.5;
-    this.root.rotation.x += (rx - this.root.rotation.x) * k;
-    this.root.rotation.y += ((sprint ? 0.6 : 0) - this.root.rotation.y) * k;
+    const a = Math.min(1, dt * 12);
+    this.adsK += ((ads ? 1 : 0) - this.adsK) * Math.min(1, dt * 14);
+    this.sprintK += ((sprint && !ads ? 1 : 0) - this.sprintK) * Math.min(1, dt * 9);
+    this.slideK += ((slide ? 1 : 0) - this.slideK) * a;
+    this.drawT = Math.min(1, this.drawT + dt / 0.4);
+    if (action !== this.lastAction) { this.actionT = 0; this.lastAction = action; }
+    this.actionT += dt;
+
+    // molas de recuo
+    const kz = spring(this.kz, 0, 180, 18, dt), kr = spring(this.kr, 0, 160, 16, dt), ky = spring(this.ky, 0, 120, 14, dt), ld = spring(this.land, 0, 90, 10, dt);
+    this.fireRoll *= Math.max(0, 1 - dt * 10);
+    // sway / bob
+    this.swayX += (-mouseDX * 0.0018 - this.swayX) * Math.min(1, dt * 8); this.swayY += (mouseDY * 0.0018 - this.swayY) * Math.min(1, dt * 8);
+    const mv = moving && grounded ? Math.min(1, speed / 4) : 0;
+    this.bob += dt * (sprint ? 13 : 8.5) * (mv > 0 ? 1 : 0);
+    const amp = (sprint ? 0.028 : 0.012) * mv * (1 - this.adsK * 0.85);
+    const bx = Math.sin(this.bob) * amp, by = -Math.abs(Math.cos(this.bob)) * amp * 0.8;
+    const breathe = Math.sin(this.t * 1.6) * 0.003 * (1 - this.adsK * 0.7);
+
+    // pose-base: quadril ↔ mira ↔ sprint
+    const hip = [0.22, -0.22, -0.4], aim = [0, -0.115, -0.3], spr = [0.2, -0.3, -0.32];
+    const px = hip[0] + (aim[0] - hip[0]) * this.adsK + (spr[0] - hip[0]) * this.sprintK;
+    const py = hip[1] + (aim[1] - hip[1]) * this.adsK + (spr[1] - hip[1]) * this.sprintK;
+    const pz = hip[2] + (aim[2] - hip[2]) * this.adsK + (spr[2] - hip[2]) * this.sprintK;
+    let rx = kr * 0.012 + this.sprintK * -0.25, ry = this.sprintK * 0.7, rz = this.sprintK * 0.35 + this.fireRoll + this.slideK * 0.25;
+    let ox = 0, oy = 0, oz = 0;
+
+    // ações
+    const t = this.actionT, T = Math.max(0.2, actionTime);
+    if (action === 'reload') {
+      const k = Math.min(1, t / T);
+      const inOut = k < 0.2 ? smooth(k / 0.2) : k > 0.8 ? 1 - smooth((k - 0.8) / 0.2) : 1;
+      rz += 0.55 * inOut; rx += -0.18 * inOut; oy -= 0.04 * inOut;
+      if (this.left) {   // mão de apoio: tira o carregador, desce, volta e dá o tapa
+        const m = k < 0.25 ? 0 : k < 0.45 ? smooth((k - 0.25) / 0.2) : k < 0.65 ? 1 : k < 0.85 ? 1 - smooth((k - 0.65) / 0.2) : 0;
+        this.left.position.set(this.leftRest.x + 0.05 * m, this.leftRest.y - 0.28 * m, this.leftRest.z + 0.18 * m);
+        if (k > 0.82 && k < 0.9) oy += 0.012;   // tranco do carregador entrando
+      }
+    } else if (action === 'plate' || action === 'heal' || action === 'revive' || action === 'chest') {
+      const k = Math.min(1, t / 0.25), down = smooth(k);
+      rx += -0.9 * down; oy -= 0.18 * down; oz += 0.06 * down;
+      if (this.left) { const w = Math.sin(t * 9) * 0.02; this.left.position.set(this.leftRest.x - 0.05, this.leftRest.y + 0.1 * down + w, this.leftRest.z - 0.1 * down); }
+    } else if (this.left) {
+      this.left.position.lerp(this.leftRest, Math.min(1, dt * 14));
+    }
+    // sacar a arma
+    const d = 1 - smooth(this.drawT); rx += -1.0 * d; oy -= 0.3 * d;
+
+    const p = this.root.position, k = Math.min(1, dt * 18);
+    p.x += (px + bx + this.swayX * (1 - this.adsK * 0.7) + ox - p.x) * k;
+    p.y += (py + by + breathe + this.swayY * (1 - this.adsK * 0.7) + oy + ld * 0.05 - p.y) * k;
+    p.z = pz + kz * 0.05 * (1 - this.adsK * 0.4) + oz;
+    this.root.rotation.x += (rx + ld * 0.08 - this.root.rotation.x) * k;
+    this.root.rotation.y += (ry + ky * 0.01 - this.root.rotation.y) * k;
+    this.root.rotation.z += (rz - this.root.rotation.z) * k;
   }
 }
