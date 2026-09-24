@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Resurgence Zone</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="menu">
+  <div class="menu-bg"></div>
+  <div class="menu-content">
+    <h1>RESURGENCE<span>ZONE</span></h1>
+    <p class="sub">Battle Royale • Ressurgimento • 20 Operadores</p>
+    <button id="playBtn">JOGAR</button>
+    <div class="controls">
+      <b>WASD</b> mover • <b>Mouse</b> mirar • <b>Clique</b> atirar • <b>Botão direito</b> ADS<br>
+      <b>Shift</b> correr • <b>Espaço</b> pular • <b>C</b> agachar • <b>R</b> recarregar • <b>1/2</b> trocar arma<br>
+      <b>E</b> abrir baú / pegar • <b>Q</b> placa de armadura • <b>M</b> mapa
+    </div>
+    <p class="rules">Morreu? Você volta de paraquedas enquanto o <b>ressurgimento</b> estiver ativo.
+    Quando o timer de resurgência desliga (círculo final), a morte é definitiva.</p>
+  </div>
+</div>
+
+<div id="hud" class="hidden">
+  <div id="crosshair"><i></i><i></i><i></i><i></i></div>
+  <div id="hitmarker"></div>
+  <div id="topbar">
+    <div id="alive">VIVOS <b>20</b></div>
+    <div id="kills">ABATES <b>0</b></div>
+    <div id="circle">GÁS <b>--</b></div>
+    <div id="resp">RESSURGIMENTO <b>--</b></div>
+  </div>
+  <canvas id="minimap" width="200" height="200"></canvas>
+  <div id="killfeed"></div>
+  <div id="vitals">
+    <div id="plates"><i></i><i></i><i></i></div>
+    <div id="hpbar"><div></div></div>
+    <div id="platecount">Placas: <b>2</b></div>
+  </div>
+  <div id="weapon">
+    <div id="wname">M4</div>
+    <div id="ammo"><b>30</b> / 90</div>
+    <div id="cash">$ <b>0</b></div>
+  </div>
+  <div id="prompt"></div>
+  <div id="center-msg"></div>
+  <div id="gasOverlay"></div>
+  <div id="dmgOverlay"></div>
+  <canvas id="bigmap" width="600" height="600" class="hidden"></canvas>
+</div>
+
+<div id="endscreen" class="hidden">
+  <h1 id="endtitle">VITÓRIA</h1>
+  <p id="endstats"></p>
+  <button onclick="location.reload()">JOGAR NOVAMENTE</button>
+</div>
+
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module" src="game.js"></script>
+</body>
+</html>

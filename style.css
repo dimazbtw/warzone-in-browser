@@ -1,0 +1,54 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #000; overflow: hidden; font-family: "Segoe UI", Arial, sans-serif; color: #fff; user-select: none; }
+canvas { display: block; }
+.hidden { display: none !important; }
+
+#menu { position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; }
+.menu-bg { position: absolute; inset: 0; background: url("https://d8j0ntlcm91z4.cloudfront.net/user_3Jib0BzU3aLdeWOQjrliCwaWdFv/hf_20260924_172030_fa536447-6597-4a41-9e83-eb214489af0f.png") center/cover, linear-gradient(135deg, #1a1d12, #3b2a14); }
+.menu-bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, rgba(0,0,0,.9) 0%, rgba(0,0,0,.5) 50%, rgba(0,0,0,0) 100%); }
+.menu-content { position: relative; padding: 6vw; max-width: 640px; }
+h1 { font-size: 64px; font-weight: 900; letter-spacing: 4px; line-height: 1; }
+h1 span { display: block; color: #f5b400; font-size: 88px; }
+.sub { margin: 12px 0 28px; opacity: .8; letter-spacing: 2px; text-transform: uppercase; }
+button { background: #f5b400; color: #111; border: 0; font-size: 26px; font-weight: 900; padding: 16px 64px; cursor: pointer; letter-spacing: 3px; clip-path: polygon(0 0, 100% 0, 94% 100%, 0 100%); }
+button:hover { background: #ffd24d; }
+.controls, .rules { margin-top: 28px; font-size: 14px; line-height: 1.8; opacity: .85; }
+.controls b, .rules b { color: #f5b400; }
+
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+#crosshair { position: absolute; left: 50%; top: 50%; width: 0; height: 0; }
+#crosshair i { position: absolute; background: #fff; box-shadow: 0 0 2px #000; transition: all .08s; }
+#crosshair i:nth-child(1) { width: 2px; height: 8px; left: -1px; top: calc(-8px - var(--s, 6px)); }
+#crosshair i:nth-child(2) { width: 2px; height: 8px; left: -1px; top: var(--s, 6px); }
+#crosshair i:nth-child(3) { width: 8px; height: 2px; top: -1px; left: calc(-8px - var(--s, 6px)); }
+#crosshair i:nth-child(4) { width: 8px; height: 2px; top: -1px; left: var(--s, 6px); }
+#hitmarker { position: absolute; left: 50%; top: 50%; width: 24px; height: 24px; margin: -12px; opacity: 0;
+  background: linear-gradient(45deg, transparent 45%, #fff 45%, #fff 55%, transparent 55%), linear-gradient(-45deg, transparent 45%, #fff 45%, #fff 55%, transparent 55%); }
+#hitmarker.kill { filter: drop-shadow(0 0 2px red) hue-rotate(0) saturate(10); background-color: transparent; }
+#topbar { position: absolute; top: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 10px; }
+#topbar div { background: rgba(0,0,0,.55); padding: 6px 14px; font-size: 13px; letter-spacing: 1px; border-bottom: 2px solid #f5b400; }
+#topbar b { font-size: 17px; margin-left: 6px; }
+#resp.off { border-color: #e33; }
+#minimap { position: absolute; top: 14px; left: 14px; border: 2px solid rgba(255,255,255,.4); background: #000; }
+#killfeed { position: absolute; top: 14px; right: 14px; text-align: right; font-size: 14px; }
+#killfeed div { background: rgba(0,0,0,.55); padding: 4px 10px; margin-bottom: 4px; }
+#killfeed .me { color: #f5b400; }
+#vitals { position: absolute; bottom: 24px; left: 24px; width: 280px; }
+#plates { display: flex; gap: 4px; margin-bottom: 4px; }
+#plates i { flex: 1; height: 8px; background: rgba(255,255,255,.15); position: relative; overflow: hidden; }
+#plates i::after { content: ""; position: absolute; inset: 0; width: var(--f, 0%); background: #4fb3ff; }
+#hpbar { height: 10px; background: rgba(255,255,255,.15); }
+#hpbar div { height: 100%; width: 100%; background: #fff; transition: width .1s; }
+#platecount { margin-top: 6px; font-size: 13px; opacity: .85; }
+#weapon { position: absolute; bottom: 24px; right: 24px; text-align: right; }
+#wname { font-size: 16px; letter-spacing: 2px; opacity: .8; }
+#ammo { font-size: 20px; } #ammo b { font-size: 40px; }
+#cash { color: #6fdc6f; font-size: 16px; }
+#prompt { position: absolute; top: 62%; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,.6); padding: 6px 14px; font-size: 15px; display: none; }
+#center-msg { position: absolute; top: 28%; left: 0; right: 0; text-align: center; font-size: 30px; font-weight: 800; letter-spacing: 3px; text-shadow: 0 2px 6px #000; }
+#gasOverlay { position: absolute; inset: 0; background: radial-gradient(circle, rgba(255,120,0,.25), rgba(255,80,0,.6)); opacity: 0; transition: opacity .3s; }
+#dmgOverlay { position: absolute; inset: 0; box-shadow: inset 0 0 160px rgba(200,0,0,.9); opacity: 0; transition: opacity .2s; }
+#bigmap { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); border: 3px solid #f5b400; }
+
+#endscreen { position: fixed; inset: 0; z-index: 30; background: rgba(0,0,0,.85); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; }
+#endscreen p { font-size: 20px; opacity: .85; }
