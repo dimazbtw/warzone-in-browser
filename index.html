@@ -4,75 +4,66 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Zona Ressurge</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="client/style.css">
 </head>
 <body>
-<div id="menu">
-  <div class="menu-bg"></div>
-  <div class="menu-content" id="mainPanel">
-    <h1>ZONA<span>RESSURGE</span></h1>
-    <p class="sub">Battle Royale • Ressurgimento • 20 Operadores</p>
-    <button id="playBtn">JOGAR</button>
-    <div class="controls">
-      <b>WASD</b> mover • <b>Mouse</b> mirar • <b>Clique</b> atirar • <b>Botão direito</b> ADS<br>
-      <b>Shift</b> correr • <b>Espaço</b> pular • <b>C</b> agachar • <b>R</b> recarregar • <b>1/2</b> trocar arma<br>
-      <b>E</b> abrir baú / pegar • <b>Q</b> placa de armadura • <b>G</b> granada • <b>B</b> comprar Caixa de Equipamento ($5000) • <b>M</b> mapa
-    </div>
-    <p class="rules">Morreu? Você volta de paraquedas enquanto o <b>ressurgimento</b> estiver ativo.
-    Quando o ressurgimento desliga (fase 4 do gás), a morte é definitiva.</p>
-  </div>
+<canvas id="gl"></canvas>
 
-  <div id="loadout" class="hidden">
-    <div class="lo-head"><h2>LOADOUT</h2><span>Escolha seu operador e equipamento</span></div>
-    <div class="lo-section"><h3>OPERADOR</h3><div class="lo-row" id="loOperators"></div></div>
-    <div class="lo-grid">
-      <div class="lo-section"><h3>ARMA PRIMÁRIA</h3><div class="lo-list" id="loPrimary"></div></div>
-      <div class="lo-section"><h3>ARMA SECUNDÁRIA</h3><div class="lo-list" id="loSecondary"></div></div>
-      <div class="lo-section"><h3>CAMUFLAGEM</h3><div class="lo-list" id="loCamo"></div></div>
-      <div class="lo-section"><h3>VANTAGEM</h3><div class="lo-list" id="loPerk"></div></div>
-      <div class="lo-section"><h3>LETAL</h3><div class="lo-list" id="loLethal"></div></div>
+<!-- ============ MENU / LOBBY ============ -->
+<div id="menu" class="screen">
+  <div class="menu-bg"></div>
+  <div class="menu-panel">
+    <h1>ZONA<span>RESSURGE</span></h1>
+    <p class="sub">Battle Royale • Ressurgimento • Multiplayer</p>
+    <form id="joinForm">
+      <input id="name" placeholder="Seu nome" maxlength="16" required autocomplete="off">
+      <input id="party" placeholder="Código de party (opcional)" maxlength="12" autocomplete="off">
+      <button>ENTRAR NO LOBBY</button>
+    </form>
+    <div id="lobbyBox" class="hidden">
+      <div id="lobbyHead"></div>
+      <div id="lobbyList"></div>
+      <p class="muted">Clique na tela para capturar o mouse quando a partida começar.</p>
     </div>
-    <div class="lo-foot"><canvas id="loPreview" width="420" height="140"></canvas><div id="loStats"></div><button id="deployBtn">IMPLANTAR</button></div>
+    <details class="settings"><summary>Configurações</summary>
+      <label>Sensibilidade <input id="sens" type="range" min="0.0008" max="0.005" step="0.0001"></label>
+      <label>Volume <input id="vol" type="range" min="0" max="1" step="0.05"></label>
+    </details>
+    <div class="controls">
+      <b>WASD</b> mover • <b>Shift</b> correr (2× = tático) • <b>C</b> agachar/slide • <b>Z</b> prone • <b>Espaço</b> pular/mantle/escalar/paraquedas<br>
+      <b>Clique</b> atirar • <b>Botão dir.</b> mirar • <b>R</b> recarregar • <b>1/2</b> armas • <b>Q</b> placa • <b>H</b> cura • <b>G</b> granada<br>
+      <b>E</b> pegar / segurar para reviver • <b>F</b> contrato • <b>B</b> estação • <b>M</b> mapa • <b>Tab</b> placar • <b>[ ]</b> espectador
+    </div>
+    <p class="muted"><a href="client-debug/">cliente de debug 2D</a> · <a href="offline/">protótipo offline</a></p>
   </div>
 </div>
 
+<!-- ============ HUD ============ -->
 <div id="hud" class="hidden">
   <div id="crosshair"><i></i><i></i><i></i><i></i></div>
   <div id="hitmarker"></div>
+  <div id="dmgDirs"></div>
   <div id="scope" class="hidden"></div>
-
   <div id="compass"><div id="compassStrip"></div><i class="needle"></i></div>
-
   <div id="mmWrap"><canvas id="minimap" width="220" height="220"></canvas><span class="north">N</span></div>
-  <div id="gasinfo"><div id="circle">⚠ <b>--</b></div><div id="resp">RESSURGIMENTO <b>--</b></div></div>
-
-  <div id="topright"><span id="alive">👤 <b>20</b></span><span id="kills">☠ <b>0</b></span></div>
+  <div id="zoneInfo"></div>
+  <div id="topright"></div>
   <div id="killfeed"></div>
-
-  <div id="squad">
-    <div class="sq-row me"><span class="tag">[RZ]</span> <span id="sqName">Você</span><span id="cash">$ <b>0</b></span>
-      <div id="vitals"><div id="plates"><i></i><i></i><i></i></div><div id="hpbar"><div></div></div></div>
-    </div>
-  </div>
-
-  <div id="weapon">
-    <div id="equip"><span id="lethal">💣 <b>2</b></span><span id="platecount">🛡 <b>2</b></span></div>
-    <div class="wrow"><canvas id="wicon" width="140" height="44"></canvas><div id="ammo"><b>30</b><small>90</small></div></div>
-    <div id="wname">M4</div>
-  </div>
-
+  <div id="contract" class="hidden"></div>
+  <div id="squad"></div>
+  <div id="weapon"></div>
+  <div id="actionBar" class="hidden"><div></div><span></span></div>
   <div id="prompt"></div>
-  <div id="center-msg"></div>
-  <div id="gasOverlay"></div>
-  <div id="dmgOverlay"></div>
-  <canvas id="bigmap" width="600" height="600" class="hidden"></canvas>
+  <div id="center"></div>
+  <div id="toast"></div>
+  <div id="respawn" class="hidden"></div>
+  <div id="shop" class="hidden"></div>
+  <canvas id="bigmap" width="640" height="640" class="hidden"></canvas>
+  <div id="scoreboard" class="hidden"></div>
+  <div id="netStatus"></div>
 </div>
 
-<div id="endscreen" class="hidden">
-  <h1 id="endtitle">VITÓRIA</h1>
-  <p id="endstats"></p>
-  <button onclick="location.reload()">JOGAR NOVAMENTE</button>
-</div>
+<div id="end" class="screen hidden"><h1 id="endTitle"></h1><div id="endStats"></div><p class="muted">Novo lobby em instantes…</p></div>
 
 <script type="importmap">
 { "imports": {
@@ -80,6 +71,6 @@
   "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
 } }
 </script>
-<script type="module" src="game.js"></script>
+<script type="module" src="client/main.js"></script>
 </body>
 </html>

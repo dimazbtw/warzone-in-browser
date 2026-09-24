@@ -64,7 +64,7 @@ export class NetworkSystem {
       this.broadcastLobby();
       return;
     }
-    if (msg.t === C2S.PING) { this.send(s, S2C.PONG, { t: msg.t0 }); return; }
+    if (msg.t === C2S.PING) { this.send(s, S2C.PONG, { t0: msg.t0 }); return; }
     if (msg.t === 'pong2') { s.player.latency = Math.min(0.5, Math.max(0, (Date.now() - s.pingSent) / 2000)); return; }
     match.handle(s.player, msg);
   }
