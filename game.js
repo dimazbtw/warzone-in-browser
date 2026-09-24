@@ -16,12 +16,12 @@ const PLAYER_H = 1.7, CROUCH_H = 1.1, PLAYER_R = 0.4;
 const GRAV = 22;
 
 const WEAPONS = {
-  pistol:  { name: 'X12 PISTOLA',   dmg: 22, rpm: 380, mag: 12, reserve: 60,  spread: 0.018, auto: false, range: 80,  reload: 1.2, pellets: 1, rec: 0.012 },
-  m4:      { name: 'M4 FUZIL',      dmg: 26, rpm: 780, mag: 30, reserve: 120, spread: 0.022, auto: true,  range: 160, reload: 1.8, pellets: 1, rec: 0.008 },
-  ak47:    { name: 'AK-47',         dmg: 32, rpm: 600, mag: 30, reserve: 120, spread: 0.028, auto: true,  range: 150, reload: 2.0, pellets: 1, rec: 0.013 },
-  mp5:     { name: 'MP5 SMG',       dmg: 20, rpm: 950, mag: 32, reserve: 128, spread: 0.035, auto: true,  range: 70,  reload: 1.5, pellets: 1, rec: 0.006 },
-  shotgun: { name: 'LOCKWOOD 12G',  dmg: 14, rpm: 90,  mag: 6,  reserve: 30,  spread: 0.09,  auto: false, range: 30,  reload: 2.4, pellets: 9, rec: 0.04 },
-  sniper:  { name: 'KAR98K',        dmg: 110,rpm: 55,  mag: 5,  reserve: 25,  spread: 0.001, auto: false, range: 400, reload: 2.6, pellets: 1, rec: 0.06 },
+  pistol:  { name: 'VESPA 9',   dmg: 22, rpm: 380, mag: 12, reserve: 60,  spread: 0.018, auto: false, range: 80,  reload: 1.2, pellets: 1, rec: 0.012 },
+  m4:      { name: 'CARCARÁ AR',      dmg: 26, rpm: 780, mag: 30, reserve: 120, spread: 0.022, auto: true,  range: 160, reload: 1.8, pellets: 1, rec: 0.008 },
+  ak47:    { name: 'JAGUAR BR',         dmg: 32, rpm: 600, mag: 30, reserve: 120, spread: 0.028, auto: true,  range: 150, reload: 2.0, pellets: 1, rec: 0.013 },
+  mp5:     { name: 'COLIBRI SMG',       dmg: 20, rpm: 950, mag: 32, reserve: 128, spread: 0.035, auto: true,  range: 70,  reload: 1.5, pellets: 1, rec: 0.006 },
+  shotgun: { name: 'TATU 12',  dmg: 14, rpm: 90,  mag: 6,  reserve: 30,  spread: 0.09,  auto: false, range: 30,  reload: 2.4, pellets: 9, rec: 0.04 },
+  sniper:  { name: 'HARPIA DMR',        dmg: 110,rpm: 55,  mag: 5,  reserve: 25,  spread: 0.001, auto: false, range: 400, reload: 2.6, pellets: 1, rec: 0.06 },
 };
 const LOOT_WEAPONS = ['m4', 'ak47', 'mp5', 'shotgun', 'sniper'];
 
@@ -311,10 +311,10 @@ const sfx = {
 // ================== OPERADORES / CAMUFLAGENS ==================
 const IMG = 'https://d8j0ntlcm91z4.cloudfront.net/user_3Jib0BzU3aLdeWOQjrliCwaWdFv/hf_20260924_';
 const OPERATORS = [
-  { id: 'reaper', name: 'REAPER', desc: 'Força Tarefa Sombra', img: IMG + '172742_fcfe9b2a-ad86-4cbc-8633-a21d62693126.png', uniform: 0x1d1f22, vest: 0x111214, skin: 0x6b4e3a, glove: 0x161616, head: 'skull' },
-  { id: 'sahara', name: 'SAHARA', desc: 'Forças Especiais do Deserto', img: IMG + '172741_fc82033c-57a6-465e-b84f-c4ddbf864b19.png', uniform: 0xa58d66, vest: 0x7a6545, skin: 0x9a7255, glove: 0x5c4a33, head: 'cap' },
-  { id: 'ranger', name: 'RANGER', desc: 'Veterano de Floresta', img: IMG + '172741_1e19f3c4-8a62-4386-b105-5b0b7106dd7c.png', uniform: 0x4a5634, vest: 0x3a4228, skin: 0xa87d5d, glove: 0x2f3322, head: 'boonie' },
-  { id: 'nightops', name: 'NIGHT OPS', desc: 'Unidade Urbana Noturna', img: IMG + '172742_67718c5b-9753-4537-ac4e-3dd3276d2cde.png', uniform: 0x1f2a3d, vest: 0x161e2b, skin: 0x7c5a44, glove: 0x101318, head: 'nvg' },
+  { id: 'reaper', name: 'CAVEIRA', desc: 'Força Tarefa Sombra', img: IMG + '172742_fcfe9b2a-ad86-4cbc-8633-a21d62693126.png', uniform: 0x1d1f22, vest: 0x111214, skin: 0x6b4e3a, glove: 0x161616, head: 'skull' },
+  { id: 'sahara', name: 'DUNA', desc: 'Forças Especiais do Deserto', img: IMG + '172741_fc82033c-57a6-465e-b84f-c4ddbf864b19.png', uniform: 0xa58d66, vest: 0x7a6545, skin: 0x9a7255, glove: 0x5c4a33, head: 'cap' },
+  { id: 'ranger', name: 'MATEIRO', desc: 'Veterano de Floresta', img: IMG + '172741_1e19f3c4-8a62-4386-b105-5b0b7106dd7c.png', uniform: 0x4a5634, vest: 0x3a4228, skin: 0xa87d5d, glove: 0x2f3322, head: 'boonie' },
+  { id: 'nightops', name: 'NOTURNO', desc: 'Unidade Urbana Noturna', img: IMG + '172742_67718c5b-9753-4537-ac4e-3dd3276d2cde.png', uniform: 0x1f2a3d, vest: 0x161e2b, skin: 0x7c5a44, glove: 0x101318, head: 'nvg' },
 ];
 const CAMOS = {
   black:  { name: 'Preto Fosco', desc: 'Padrão de fábrica', colors: ['#1c1c1c', '#232323', '#161616'] },
@@ -338,10 +338,10 @@ function camoTex(id) {
   return (camoTexCache[id] = t);
 }
 const PERKS = {
-  doubletime: { name: 'Double Time', desc: 'Corrida tática +25% mais rápida' },
-  amped:      { name: 'Amped', desc: 'Recarga e troca de arma 40% mais rápidas' },
-  tuneup:     { name: 'Tune Up', desc: 'Ressurgimento 5s mais rápido' },
-  ghost:      { name: 'Ghost', desc: 'Inimigos demoram mais para te notar' },
+  doubletime: { name: 'Passo Largo', desc: 'Corrida tática +25% mais rápida' },
+  amped:      { name: 'Mãos Rápidas', desc: 'Recarga e troca de arma 40% mais rápidas' },
+  tuneup:     { name: 'Retorno Ágil', desc: 'Ressurgimento 5s mais rápido' },
+  ghost:      { name: 'Sombra', desc: 'Inimigos demoram mais para te notar' },
 };
 const LETHALS = {
   frag:   { name: 'Granada Frag', desc: 'Quica e explode em 2s', count: 2 },
@@ -492,7 +492,7 @@ function spark(p, color = 0xffcc66) {
 }
 
 // ================== ENTIDADES ==================
-const NAMES = ['Ghost', 'Soap', 'Price', 'Gaz', 'Nikto', 'Roze', 'Farah', 'Alex', 'Mace', 'Krueger', 'Valeria', 'Hudson', 'Woods', 'Mason', 'Adler', 'Park', 'Nova', 'Stitch', 'Raptor'];
+const NAMES = ['Aurora', 'Bento', 'Caju', 'Dara', 'Elo', 'Fumaça', 'Guará', 'Hélio', 'Iara', 'Jambo', 'Kiko', 'Lume', 'Maré', 'Nado', 'Onça', 'Pipa', 'Quartzo', 'Raio', 'Sabiá'];
 const canopyMat = new THREE.MeshStandardMaterial({ color: 0x6b6a34, side: THREE.DoubleSide, roughness: 0.9 });
 function makeSoldierMesh(op) {
   const g = new THREE.Group();
@@ -1082,7 +1082,7 @@ function updateGrenades(dt) {
 const drop = { crate: null, x: 0, z: 0, y: 0, cd: 0, smoke: null };
 function buyLoadout() {
   if (!player.alive || player.dropping) return;
-  if (drop.crate) return announce('LOADOUT DROP JÁ ESTÁ NO MAPA', 2);
+  if (drop.crate) return announce('CAIXA DE EQUIPAMENTO JÁ ESTÁ NO MAPA', 2);
   if (drop.cd > 0) return announce(`LOADOUT DISPONÍVEL EM ${Math.ceil(drop.cd)}s`, 2);
   if (player.cash < 5000) return announce('DINHEIRO INSUFICIENTE ($5000)', 2);
   player.cash -= 5000; drop.cd = 90;
@@ -1096,7 +1096,7 @@ function buyLoadout() {
   drop.crate = g;
   const smoke = new THREE.Mesh(C(0.4, 1.4, 30, 10), new THREE.MeshBasicMaterial({ color: 0x7cff6b, transparent: true, opacity: 0.25, depthWrite: false }));
   smoke.position.set(drop.x, 15, drop.z); scene.add(smoke); drop.smoke = smoke;
-  announce('LOADOUT DROP A CAMINHO', 2.5); tone(700, 0.2, 0.08, 'sine');
+  announce('CAIXA DE EQUIPAMENTO A CAMINHO', 2.5); tone(700, 0.2, 0.08, 'sine');
 }
 function updateDrop(dt) {
   drop.cd -= dt;

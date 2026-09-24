@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zona Ressurge — Cliente de Debug</title>
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  body { background: #0d0f0c; color: #eee; font: 13px/1.4 system-ui, sans-serif; overflow: hidden; }
+  canvas { display: block; }
+  .panel { position: fixed; background: rgba(0,0,0,.6); padding: 8px 10px; border-left: 3px solid #e8b13a; }
+  #join { inset: 0; display: flex; align-items: center; justify-content: center; background: #0d0f0c; border: 0; }
+  #join form { display: grid; gap: 8px; width: 300px; }
+  #join h1 { font-size: 28px; letter-spacing: 3px; color: #e8b13a; }
+  input, button { font: inherit; padding: 8px; border: 1px solid #444; background: #1a1d18; color: #eee; }
+  button { background: #e8b13a; color: #111; font-weight: 700; cursor: pointer; border: 0; }
+  #lobby { top: 12px; left: 12px; width: 280px; }
+  #hud-l { left: 12px; bottom: 12px; width: 300px; }
+  #hud-r { right: 12px; bottom: 12px; text-align: right; width: 260px; border-left: 0; border-right: 3px solid #e8b13a; }
+  #top { top: 10px; left: 50%; transform: translateX(-50%); text-align: center; border-left: 0; border-bottom: 2px solid #e8b13a; }
+  #feed { top: 12px; right: 12px; text-align: right; border: 0; background: none; }
+  #feed div { background: rgba(0,0,0,.55); padding: 2px 8px; margin-bottom: 2px; }
+  #center { top: 22%; left: 0; right: 0; text-align: center; font-size: 26px; font-weight: 800; letter-spacing: 2px; background: none; border: 0; text-shadow: 0 2px 4px #000; pointer-events: none; }
+  #end { inset: 0; display: none; align-items: center; justify-content: center; flex-direction: column; background: rgba(0,0,0,.85); border: 0; }
+  #end table { border-collapse: collapse; margin-top: 12px; } #end td, #end th { padding: 3px 10px; border-bottom: 1px solid #333; }
+  .bar { height: 7px; background: #333; margin: 3px 0; } .bar i { display: block; height: 100%; }
+  .sq { display: flex; justify-content: space-between; gap: 8px; }
+  .st-alive { color: #7cff6b } .st-downed { color: #ffb13a } .st-awaiting { color: #6ec6ff } .st-eliminated { color: #ff5050 }
+  .muted { opacity: .65 } b.y { color: #e8b13a }
+  #help { bottom: 12px; left: 50%; transform: translateX(-50%); font-size: 11px; opacity: .8; display: none; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="join" class="panel">
+  <form id="joinForm">
+    <h1>ZONA RESSURGE</h1>
+    <div class="muted">Cliente de debug multiplayer (servidor autoritativo)</div>
+    <input id="name" placeholder="Seu nome" maxlength="16" required>
+    <input id="party" placeholder="Código de party (opcional)" maxlength="12">
+    <button>ENTRAR NO LOBBY</button>
+    <div class="muted">Abra várias abas para testar com mais humanos. Bots completam o lobby.</div>
+  </form>
+</div>
+<div id="lobby" class="panel" style="display:none"></div>
+<div id="top" class="panel" style="display:none"></div>
+<div id="feed" class="panel"></div>
+<div id="center" class="panel"></div>
+<div id="hud-l" class="panel" style="display:none"></div>
+<div id="hud-r" class="panel" style="display:none"></div>
+<div id="help" class="panel">
+  WASD mover • Mouse mirar • Clique atirar • Botão dir. ADS • Shift sprint • Alt/Shift+W 2x: sprint tático<br>
+  C agachar • Z prone • Espaço pular/ejetar/paraquedas • E pegar loot / segurar p/ reviver • R recarregar<br>
+  1/2 armas • Q placa (segure p/ várias) • H cura • G granada • [ ] trocar espectador
+</div>
+<div id="end" class="panel"><h1 id="endTitle"></h1><div id="endStats"></div></div>
+<script type="module" src="client.js"></script>
+</body>
+</html>

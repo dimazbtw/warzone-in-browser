@@ -1,0 +1,15 @@
+{
+  "name": "zona-ressurge",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Battle royale com Resurgence — servidor autoritativo + clientes web",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "LOG_LEVEL=debug node server/index.js",
+    "test": "node --test tests/*.test.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}
