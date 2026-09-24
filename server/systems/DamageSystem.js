@@ -14,6 +14,8 @@ export class DamageSystem {
     if (!victim?.is(...DAMAGEABLE) || !(amount > 0)) return 0;
     if (attacker && attacker !== victim && !this.friendlyFire && ctx.systems.squad.areAllies(attacker, victim)) return 0;
     if (attacker && attacker !== victim) victim.lastAttacker = attacker.id;
+    // bots causam menos dano em humanos conforme a dificuldade (não vale para finalização/zona)
+    if (attacker?.isBot && !victim.isBot && info.weapon !== 'melee') amount *= ctx.systems.bots?.preset?.damageVsHuman ?? 1;
     victim.lastDamageAt = now;
     ctx.systems.inventory.cancelAction(victim, 'plate');
 

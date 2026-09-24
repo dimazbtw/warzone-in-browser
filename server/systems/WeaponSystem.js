@@ -13,7 +13,7 @@ import { Pool } from '../core/Pool.js';
  */
 export class WeaponSystem {
   constructor(ctx) {
-    this.ctx = ctx; this.projectiles = []; this.grenades = [];
+    this.ctx = ctx; this.projectiles = []; this.grenades = []; this.smokes = [];
     this.pool = new Pool(() => ({ o: { x: 0, y: 0, z: 0 }, v: { x: 0, y: 0, z: 0 } }), null, 128);
   }
 
@@ -30,7 +30,8 @@ export class WeaponSystem {
     const yaw = Number.isFinite(msg.yaw) ? msg.yaw : p.yaw, pitch = clamp(Number.isFinite(msg.pitch) ? msg.pitch : p.pitch, -1.5, 1.5);
     const eyeH = p.stance === 'prone' ? 0.4 : p.stance === 'crouch' ? 1.1 : 1.6;
     const origin = { x: p.pos.x, y: p.pos.y + eyeH, z: p.pos.z };
-    let spread = p.ads ? def.spreadAds : def.spreadHip;
+    const R = ctx.cfg.rarity?.[w.rarity] ?? {};
+    let spread = (p.ads ? def.spreadAds : def.spreadHip) * (R.spread ?? 1);
     if (Math.hypot(p.vel.x, p.vel.z) > 1) spread *= 1.5;
     if (!p.grounded) spread *= 2;
     if (p.stance !== 'stand') spread *= 0.75;
@@ -38,8 +39,8 @@ export class WeaponSystem {
     const hits = [];
     for (let i = 0; i < (def.pellets || 1); i++) {
       const d = dirFromAngles(yaw + (ctx.rng() - 0.5) * 2 * spread, pitch + (ctx.rng() - 0.5) * 2 * spread);
-      if (ctx.cfg.combat.mode === 'projectile') this.spawnProjectile(p, origin, d, w.id);
-      else { const h = this.trace(p, origin, d, def.range, rewind); if (h) { hits.push(h); this.hit(p, h, w.id); } }
+      if (ctx.cfg.combat.mode === 'projectile') this.spawnProjectile(p, origin, d, w.id, w.rarity);
+      else { const h = this.trace(p, origin, d, def.range * (R.range ?? 1), rewind); if (h) { hits.push(h); this.hit(p, h, w.id, w.rarity); } }
     }
     ctx.bus.emit('shot', { playerId: p.id, weapon: w.id, x: origin.x, y: origin.y, z: origin.z, yaw, pitch, hit: hits[0]?.point });
   }
@@ -74,18 +75,18 @@ export class WeaponSystem {
     return f[f.length - 1][1];
   }
 
-  hit(shooter, h, weaponId) {
-    const def = this.ctx.cfg.weapons[weaponId], mult = this.ctx.cfg.combat.bodyMultipliers;
+  hit(shooter, h, weaponId, rarity) {
+    const def = this.ctx.cfg.weapons[weaponId], mult = this.ctx.cfg.combat.bodyMultipliers, R = this.ctx.cfg.rarity?.[rarity] ?? {};
     const partMult = h.part === 'head' ? (def.headMultiplier ?? mult.head) : mult[h.part];
-    const dmg = def.damage * this.falloff(def, h.t) * partMult;
+    const dmg = def.damage * (R.damage ?? 1) * this.falloff(def, h.t / (R.range ?? 1)) * partMult;
     this.ctx.systems.damage.apply(shooter, h.target, dmg, { part: h.part, weapon: weaponId, distance: h.t });
   }
 
   // ---------- modo projétil ----------
-  spawnProjectile(p, o, d, weaponId) {
+  spawnProjectile(p, o, d, weaponId, rarity) {
     const pr = this.pool.acquire(), s = this.ctx.cfg.weapons[weaponId].projectileSpeed;
     Object.assign(pr.o, o); pr.v.x = d.x * s; pr.v.y = d.y * s; pr.v.z = d.z * s;
-    pr.owner = p; pr.weapon = weaponId; pr.traveled = 0; this.projectiles.push(pr);
+    pr.owner = p; pr.weapon = weaponId; pr.rarity = rarity; pr.traveled = 0; this.projectiles.push(pr);
   }
   tickProjectiles(dt) {
     const g = this.ctx.cfg.combat.projectileGravity;
@@ -93,7 +94,7 @@ export class WeaponSystem {
       const pr = this.projectiles[i], def = this.ctx.cfg.weapons[pr.weapon];
       const sp = Math.hypot(pr.v.x, pr.v.y, pr.v.z), step = sp * dt, d = { x: pr.v.x / sp, y: pr.v.y / sp, z: pr.v.z / sp };
       const h = this.trace(pr.owner, pr.o, d, step);
-      if (h) { h.t += pr.traveled; this.hit(pr.owner, h, pr.weapon); }
+      if (h) { h.t += pr.traveled; this.hit(pr.owner, h, pr.weapon, pr.rarity); }
       pr.o.x += pr.v.x * dt; pr.o.y += pr.v.y * dt; pr.o.z += pr.v.z * dt; pr.v.y -= g * dt; pr.traveled += step;
       if (h || pr.traveled > def.range || pr.o.y < this.ctx.map.groundHeight(pr.o.x, pr.o.z, pr.o.y)) { this.projectiles.splice(i, 1); this.pool.release(pr); }
     }
@@ -115,6 +116,7 @@ export class WeaponSystem {
       const ground = this.ctx.map.groundHeight(g.x, g.z, g.y);
       if (g.y < ground + 0.1) { g.y = ground + 0.1; g.vy *= -0.35; g.vx *= 0.6; g.vz *= 0.6; }
       g.fuse -= dt;
+      if (g.fuse <= 0 && g.smoke) { this.grenades.splice(i, 1); this.popSmoke(g); continue; }
       if (g.fuse <= 0) {
         this.grenades.splice(i, 1);
         this.ctx.bus.emit('explosion', { x: g.x, y: g.y, z: g.z, radius: L.radius, ownerId: g.owner.id });
@@ -127,5 +129,57 @@ export class WeaponSystem {
     }
   }
 
-  tick(dt) { this.tickProjectiles(dt); this.tickGrenades(dt); }
+  // ---------- corpo a corpo ----------
+  /** Golpe à frente (arco); em inimigo abatido é finalização. */
+  requestMelee(p, msg) {
+    const { ctx } = this, M = ctx.cfg.equipment.melee, now = ctx.now();
+    if (!p.is(PS.ALIVE) || p.action?.blocksFire || now < (p.meleeReadyAt ?? 0)) return;
+    p.meleeReadyAt = now + M.cooldown;
+    const yaw = Number.isFinite(msg.yaw) ? msg.yaw : p.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw);
+    let best = null, bd = M.range;
+    for (const t of ctx.players.values()) {
+      if (t === p || !t.is(...DAMAGEABLE) || ctx.systems.squad.areAllies(t, p)) continue;
+      const dx = t.pos.x - p.pos.x, dz = t.pos.z - p.pos.z, d = Math.hypot(dx, dz);
+      if (d > bd || Math.abs(t.pos.y - p.pos.y) > 1.6) continue;
+      if (d > 0.4 && (dx * fx + dz * fz) / d < Math.cos(M.arc)) continue;
+      const e = { x: p.pos.x, y: p.pos.y + 1.2, z: p.pos.z }, dir = { x: dx / (d || 1), y: 0, z: dz / (d || 1) };
+      const wall = ctx.map.raycast(e, dir, d); if (wall !== null && wall < d - 0.3) continue;
+      best = t; bd = d;
+    }
+    ctx.bus.emit('melee', { playerId: p.id, x: p.pos.x, y: p.pos.y, z: p.pos.z, hit: !!best });
+    if (!best) return;
+    const finisher = best.is(PS.DOWNED);
+    ctx.bus.emit('meleeHit', { attackerId: p.id, victimId: best.id, finisher });
+    ctx.systems.damage.apply(p, best, finisher ? 999 : M.damage, { part: 'torso', weapon: 'melee', distance: bd });
+  }
+
+  // ---------- tático: fumaça ----------
+  requestTactical(p, msg) {
+    const T = this.ctx.cfg.equipment.tactical;
+    if (!p.is(PS.ALIVE) || !(p.inv.tactical > 0) || p.action?.blocksFire) return;
+    p.inv.tactical--;
+    const d = dirFromAngles(Number(msg.yaw) || p.yaw, clamp(Number(msg.pitch) || p.pitch, -1.5, 1.5));
+    this.grenades.push({ owner: p, smoke: true, x: p.pos.x, y: p.pos.y + 1.5, z: p.pos.z, vx: d.x * T.throwSpeed, vy: d.y * T.throwSpeed + 4, vz: d.z * T.throwSpeed, fuse: T.fuse });
+  }
+  popSmoke(g) {
+    const T = this.ctx.cfg.equipment.tactical, now = this.ctx.now();
+    this.smokes.push({ x: g.x, y: g.y + 1.5, z: g.z, r: T.radius, until: now + T.duration });
+    this.ctx.bus.emit('smoke', { x: g.x, y: g.y, z: g.z, radius: T.radius, duration: T.duration, ownerId: g.owner.id });
+  }
+  /** O segmento a→b atravessa alguma fumaça ativa? (usado na percepção dos bots) */
+  smokeBlocks(a, b) {
+    if (!this.smokes.length) return false;
+    const dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z, L2 = dx * dx + dy * dy + dz * dz || 1;
+    for (const s of this.smokes) {
+      const t = clamp(((s.x - a.x) * dx + (s.y - a.y) * dy + (s.z - a.z) * dz) / L2, 0, 1);
+      const px = a.x + dx * t - s.x, py = (a.y + dy * t - s.y) * 1.6, pz = a.z + dz * t - s.z;
+      if (px * px + py * py + pz * pz < s.r * s.r * 0.8) return true;
+    }
+    return false;
+  }
+
+  tick(dt) {
+    this.tickProjectiles(dt); this.tickGrenades(dt);
+    if (this.smokes.length) { const now = this.ctx.now(); this.smokes = this.smokes.filter(s => s.until > now); }
+  }
 }

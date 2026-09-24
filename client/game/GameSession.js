@@ -46,7 +46,11 @@ export class GameSession {
     this.input.on('action', this.onAction); this.input.on('swap', this.onSwap); this.input.on('fireDown', this.onFireDown);
     this.shopClick = e => { const it = e.target.closest('[data-item]'); if (it) this.net.send(C2S.BUY, { stationId: $('shop').dataset.station, item: it.dataset.item, targetId: it.dataset.target }); };
     $('shop').addEventListener('click', this.shopClick);
-    this.keyTab = e => { if (e.code !== 'Tab' || !this.snap) return; this.hud.scoreboard(e.type === 'keydown', [{ name: this.myName, kills: this.snap.you.stats.kills, state: this.snap.you.s }, ...this.snap.squad.map(m => ({ name: m.name, kills: '-', state: m.state }))]); };
+    this.keyTab = e => {
+      if (e.code !== 'Tab' || !this.snap) return; const y = this.snap.you;
+      if (y.inv) this.hud.inventory(e.type === 'keydown', { inv: y.inv, cfg: this.cfg, squad: this.snap.squad, you: y, rarColor: RAR_COLOR });
+      else this.hud.scoreboard(e.type === 'keydown', [{ name: this.myName, kills: y.stats.kills, state: y.s }, ...this.snap.squad.map(m => ({ name: m.name, kills: '-', state: m.state }))]);
+    };
     addEventListener('keydown', this.keyTab); addEventListener('keyup', this.keyTab);
     window.ZR = this;
   }
@@ -110,7 +114,11 @@ export class GameSession {
       case 'contractBoard': { const b = this.boards.get(e.id); if (b) b.taken = e.taken; this.world.setBoard(e.id, e.taken); break; }
       case 'killfeed': this.avatars.kill(e.victimId); h.killfeed(`${e.attacker ?? '☣ zona'} ✖ ${e.victim}`, e.attackerId === me || e.victimId === me || this.isAlly(e.victimId)); if (e.attackerId === me) { h.hitmarker(false, true); a.kill(); h.xp('+100 ELIMINAÇÃO'); } break;
       case 'damage':
-        if (e.attackerId === me) { h.hitmarker(e.part === 'head', false); a.hit(e.part === 'head'); if (e.armorBroken) a.crack(); }
+        if (e.attackerId === me) {
+          h.hitmarker(e.part === 'head', false); a.hit(e.part === 'head'); if (e.armorBroken) a.crack();
+          const v = this.interp.latest?.(e.victimId) ?? this.snap?.others.find(o => o.id === e.victimId);
+          if (v && settings.get('damageNumbers') !== false) { const pr = new THREE.Vector3(v.x, v.y + 1.9, v.z).project(this.world.camera); if (pr.z < 1) h.damageNumber((pr.x * 0.5 + 0.5) * innerWidth, (-pr.y * 0.5 + 0.5) * innerHeight, e.amount, e.part === 'head' ? 'head' : e.armorHit ? 'armor' : ''); }
+        }
         if (e.victimId === me) { this.hurtT = performance.now(); if (e.fromX !== undefined && e.source !== 'zone') h.damageFrom(Math.atan2(e.fromX - this.pred.body.pos.x, -(e.fromZ - this.pred.body.pos.z))); }
         break;
       case 'downed': if (e.attackerId === me) h.notify(`${this.nameOf(e.victimId)} ABATIDO`, 1.5); else if (this.isAlly(e.victimId)) h.notify(`${this.nameOf(e.victimId)} FOI ABATIDO — reviva!`, 3); break;
@@ -140,6 +148,10 @@ export class GameSession {
       case 'contractUpdate': a.ui(); break;
       case 'contractCompleted': h.announce(`CONTRATO CONCLUÍDO · +$${e.reward.cash} · +${e.reward.xp} XP`, 3.5); a.cash(); break;
       case 'contractFailed': if (!e.start || e.playerId === me) h.notify(`Contrato: ${e.reason}`, 2.5); break;
+      case 'smoke': this.effects.smoke(e, e.radius, e.duration); a.smokePop(e); break;
+      case 'melee': if (e.playerId !== me) a.whoosh(e); break;
+      case 'meleeHit': if (e.attackerId === me) { a.stab(); h.hitmarker(false, e.finisher); if (e.finisher) h.xp('+150 FINALIZAÇÃO'); } break;
+      case 'ping': this.pings = (this.pings ?? []).filter(p => p.by !== e.playerId); this.pings.push({ ...e, by: e.playerId, until: performance.now() + (e.kind === 'enemy' ? 5000 : 9000) }); a.ping(e.kind); if (e.playerId !== me) h.notify(`${e.name}: ${{ enemy: 'INIMIGO AVISTADO', loot: 'ITEM AQUI', go: 'VAMOS PARA LÁ' }[e.kind]}`, 2); break;
       case 'plateBroken': if (e.attackerId === me) a.crack(); break;
       case 'chestOpened': this.world.setChestOpened(e.chestId); if (e.playerId === me) { a.cash(); h.notify('BAÚ ABERTO', 1.2); } break;
       case 'matchEnded':
@@ -167,7 +179,8 @@ export class GameSession {
       case 'heal': n.send(C2S.USE_HEAL); break;
       case 'lethal': n.send(C2S.THROW, { yaw: i.yaw, pitch: i.pitch }); break;
       case 'tactical': n.send(C2S.TACTICAL, { yaw: i.yaw, pitch: i.pitch }); break;
-      case 'melee': n.send(C2S.MELEE, { yaw: i.yaw }); break;
+      case 'melee': n.send(C2S.MELEE, { yaw: i.yaw }); this.vm.melee(); this.audio.whoosh(); break;
+      case 'ping': this.sendPing(); break;
       case 'interact': { const c = this.nearestChest(), it = this.nearestLoot(); if (c && (!it || c.d < it.d)) n.send(C2S.CHEST, { chestId: c.id }); else if (it) n.send(C2S.PICKUP, { lootId: it.id }); break; }
       case 'contract': { const b = this.nearBoard(); if (b) n.send(C2S.CONTRACT, { boardId: b.id }); else this.hud.notify('Nenhum tablet de contrato por perto', 1.5); break; }
       case 'shop': this.toggleShop(); break;
@@ -240,6 +253,7 @@ export class GameSession {
     const others = this.interp.sample(serverNow);
     this.avatars.update(others, dt, this.world.camera.position);
     this.remoteSteps(others, dt);
+    if (['alive', 'downed', 'parachute', 'freefall'].includes(y.s)) this.worldMarkers(others); else this.hud.markers([], this.world.camera);
     // estalos da recarga nos pontos da animação (tira / coloca o carregador)
     const ac = y.action;
     if (ac?.type === 'reload' && ac.total) { const k = 1 - ac.left / ac.total; for (const [i, at] of [[0, 0.3], [1, 0.84]]) if (k >= at && !(this.reloadMarks ??= [])[i]) { this.reloadMarks[i] = true; this.audio.reloadClick(i); } }
@@ -314,6 +328,32 @@ export class GameSession {
     world.update(dt, this.snap, cam.position, time);
     this.effects.update(dt);
     world.render();
+  }
+  /** Ping: raio da câmera; inimigo perto da linha → 'enemy', item → 'loot', senão ponto no chão. */
+  sendPing() {
+    const cam = this.world.camera, o = cam.getWorldPosition(new THREE.Vector3()), d = cam.getWorldDirection(new THREE.Vector3());
+    const t = this.geo.raycast(o, d, 350) ?? 350, hit = o.clone().addScaledVector(d, t);
+    let kind = 'go', at = hit;
+    for (const e of this.snap.others) {
+      if (e.a || e.s !== 'alive') continue;
+      const v = new THREE.Vector3(e.x - o.x, e.y + 1.2 - o.y, e.z - o.z), along = v.dot(d);
+      if (along < 0 || along > t + 2) continue;
+      if (v.addScaledVector(d, -along).length() < Math.max(1.2, along * 0.02)) { kind = 'enemy'; at = new THREE.Vector3(e.x, e.y + 1.2, e.z); break; }
+    }
+    if (kind === 'go') for (const m of this.world.loot.values()) { const it = m.userData.item; if (Math.hypot(it.x - hit.x, it.z - hit.z) < 1.5) { kind = 'loot'; at = new THREE.Vector3(it.x, it.y + 0.3, it.z); break; } }
+    this.net.send(C2S.MARK, { x: at.x, y: at.y, z: at.z, kind });
+  }
+  /** Marcadores do mundo: aliados, abatidos, pings. */
+  worldMarkers(others) {
+    const me = this.pred.body.pos, list = [], now = performance.now();
+    for (const o of others) {
+      if (!o.a || !['alive', 'downed', 'parachute', 'freefall'].includes(o.s)) continue;
+      const d = Math.hypot(o.x - me.x, o.z - me.z);
+      list.push({ x: o.x, y: o.y + 2.2, z: o.z, cls: o.s === 'downed' ? 'down' : 'ally', label: `${o.n} · ${Math.round(d)}m`, edge: o.s === 'downed' });
+    }
+    this.pings = (this.pings ?? []).filter(p => p.until > now);
+    for (const p of this.pings) list.push({ x: p.x, y: p.y + 0.4, z: p.z, cls: p.kind === 'enemy' ? 'enemy ping' : 'ping', label: `${p.kind === 'enemy' ? 'INIMIGO' : p.kind === 'loot' ? 'ITEM' : ''} ${Math.round(Math.hypot(p.x - me.x, p.z - me.z))}m`, edge: true });
+    this.hud.markers(list, this.world.camera);
   }
   /** Passos de outros jogadores (só perto, andando sem agachar) — ouvir é informação tática. */
   remoteSteps(others, dt) {

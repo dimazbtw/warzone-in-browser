@@ -16,7 +16,11 @@ export class SafeZoneSystem {
     this.from = { x: 0, z: 0, r: this.r }; this.to = { x: 0, z: 0, r: this.r };
     this.phase = -1; this.state = 'idle'; this.timer = 0; this.dps = 0;
   }
-  get phases() { return this.ctx.cfg.zone.phases; }
+  get phases() {   // timeScale < 1 acelera a partida (modo rápido offline)
+    const z = this.ctx.cfg.zone, k = z.timeScale ?? 1;
+    if (k === 1) return z.phases;
+    return (this._scaled ??= z.phases.map(ph => ({ ...ph, wait: ph.wait * k, close: ph.close * k })));
+  }
 
   start() { this.reset(); this.nextPhase(); }
 

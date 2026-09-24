@@ -128,6 +128,16 @@ export class Match {
       }
       case C2S.FIRE: S.weapons.requestFire(p, msg); break;
       case C2S.THROW: S.weapons.requestThrow(p, msg); break;
+      case C2S.MELEE: S.weapons.requestMelee(p, msg); break;
+      case C2S.TACTICAL: S.weapons.requestTactical(p, msg); break;
+      case C2S.MARK: {   // ping: só para o esquadrão, com limite de frequência
+        const now = this.ctx.now();
+        if (!p.squadId || now < (p.pingReadyAt ?? 0) || ![msg.x, msg.y, msg.z].every(Number.isFinite)) break;
+        p.pingReadyAt = now + 0.6;
+        const kind = ['enemy', 'loot', 'go'].includes(msg.kind) ? msg.kind : 'go';
+        this.ctx.bus.emit('ping', { playerId: p.id, squadId: p.squadId, name: p.name, x: +msg.x.toFixed(1), y: +msg.y.toFixed(1), z: +msg.z.toFixed(1), kind });
+        break;
+      }
       case C2S.RELOAD: S.inventory.requestReload(p); break;
       case C2S.SWITCH: S.inventory.requestSwitch(p, msg.slot); break;
       case C2S.PICKUP: S.loot.requestPickup(p, msg.lootId); break;
@@ -201,7 +211,7 @@ export class Match {
         id: p.id, s: p.state, x: +p.pos.x.toFixed(2), y: +p.pos.y.toFixed(2), z: +p.pos.z.toFixed(2), vx: +p.vel.x.toFixed(2), vz: +p.vel.z.toFixed(2),
         hp: Math.round(p.hp), ar: Math.round(p.armor), bleed: Math.round(p.bleed), st: p.stance, stam: Math.round(p.stamina), sprint: !!p.sprinting,
         seq: p.lastSeq, action: p.action && { type: p.action.type, left: +(p.action.until - ctx.now()).toFixed(2), total: +(p.action.until - p.action.started).toFixed(2) },
-        inv: p.inv && { primary: p.inv.primary, secondary: p.inv.secondary, active: p.inv.active, ammo: p.inv.ammo, plates: p.inv.plates, heals: p.inv.heals, lethal: p.inv.lethal, cash: p.inv.cash },
+        inv: p.inv && { primary: p.inv.primary, secondary: p.inv.secondary, active: p.inv.active, ammo: p.inv.ammo, plates: p.inv.plates, heals: p.inv.heals, lethal: p.inv.lethal, tactical: p.inv.tactical ?? 0, cash: p.inv.cash },
         weapon: w?.id ?? null, mag: w?.mag ?? 0,
         respawnIn: p.is(PS.AWAITING_RESPAWN) ? +p.respawnRemaining.toFixed(1) : null,
         spectating: p.spectating, stats: p.stats, squad: p.squadId,

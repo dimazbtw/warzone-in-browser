@@ -42,6 +42,8 @@ export class ViewModel {
     this.kz.v += 1.6 * recoil; this.kr.v += 9 * recoil; this.ky.v += (Math.random() - 0.5) * 3 * recoil; this.fireRoll = (Math.random() - 0.5) * 0.04 * recoil;
     this.flashT = 0.045; this.flash.rotation.z = Math.random() * 3; this.flash.scale.setScalar(0.8 + Math.random() * 0.6);
   }
+  /** Golpe de faca: a arma sai de lado e a mão varre a frente. */
+  melee() { this.meleeT = 0; }
   /** Impacto de pouso (velocidade vertical em m/s). */
   landed(speed) { this.land.v -= Math.min(4, speed * 0.25); }
 
@@ -93,6 +95,11 @@ export class ViewModel {
       if (this.left) { const w = Math.sin(t * 9) * 0.02; this.left.position.set(this.leftRest.x - 0.05, this.leftRest.y + 0.1 * down + w, this.leftRest.z - 0.1 * down); }
     } else if (this.left) {
       this.left.position.lerp(this.leftRest, Math.min(1, dt * 14));
+    }
+    // faca
+    if (this.meleeT !== undefined && this.meleeT < 0.45) {
+      this.meleeT += dt; const k = this.meleeT / 0.45, sw = Math.sin(Math.min(1, k) * Math.PI);
+      ry += -0.9 * sw; rz += 0.6 * sw; ox -= 0.18 * sw; oy -= 0.06 * sw; oz -= 0.12 * Math.sin(Math.min(1, k * 1.6) * Math.PI);
     }
     // sacar a arma
     const d = 1 - smooth(this.drawT); rx += -1.0 * d; oy -= 0.3 * d;

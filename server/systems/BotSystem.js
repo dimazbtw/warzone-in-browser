@@ -15,9 +15,9 @@ import { RARITY_ORDER } from './LootSystem.js';
  * de mira dependentes da dificuldade (cfg.bots.presets).
  */
 const PRESETS = {
-  easy:   { reaction: 0.75, aimError: 0.075, headshot: 0.05, view: 90,  burst: [2, 4], pause: [0.5, 0.9], aggression: 0.3, track: 4 },
-  normal: { reaction: 0.45, aimError: 0.045, headshot: 0.15, view: 130, burst: [3, 7], pause: [0.3, 0.6], aggression: 0.55, track: 7 },
-  hard:   { reaction: 0.25, aimError: 0.022, headshot: 0.3,  view: 170, burst: [4, 10], pause: [0.15, 0.4], aggression: 0.8, track: 11 },
+  easy:   { reaction: 0.9,  aimError: 0.1,   headshot: 0.04, view: 80,  burst: [2, 4], pause: [0.6, 1.1], aggression: 0.3, track: 3.5, warmup: 2.2, fov: 1.2, damageVsHuman: 0.6 },
+  normal: { reaction: 0.6,  aimError: 0.06,  headshot: 0.1,  view: 115, burst: [3, 6], pause: [0.4, 0.8], aggression: 0.55, track: 6, warmup: 1.5, fov: 1.6, damageVsHuman: 0.8 },
+  hard:   { reaction: 0.32, aimError: 0.03,  headshot: 0.25, view: 160, burst: [4, 9], pause: [0.2, 0.45], aggression: 0.8, track: 10, warmup: 0.8, fov: 2.2, damageVsHuman: 1 },
 };
 
 export class BotSystem {
@@ -112,10 +112,13 @@ export class BotSystem {
       const d = Math.hypot(o.pos.x - p.pos.x, o.pos.z - p.pos.z);
       if (d > P.view) continue;
       const threat = d * (p.lastAttacker === o.id && now - p.lastDamageAt < 4 ? 0.4 : 1) * (o.is(PS.DOWNED) ? 1.8 : 1);
-      if (threat < bestScore && this.canSee(p, o, P.view)) { bestScore = threat; best = o; }
+      // campo de visão: só nota quem está à frente (ou muito perto / quem o atacou / o alvo atual)
+      let da = Math.atan2(-(o.pos.x - p.pos.x), -(o.pos.z - p.pos.z)) - p.yaw; while (da > Math.PI) da -= Math.PI * 2; while (da < -Math.PI) da += Math.PI * 2;
+      const aware = Math.abs(da) < P.fov / 2 + 0.2 || d < 6 || o === b.target || (p.lastAttacker === o.id && now - p.lastDamageAt < 3);
+      if (aware && threat < bestScore && this.canSee(p, o, P.view)) { bestScore = threat; best = o; }
     }
     if (best) {
-      if (b.target !== best) { b.target = best; b.reactUntil = now + P.reaction * ctx.rng.range(0.7, 1.3); b.aimYaw = p.yaw; b.aimPitch = 0; }
+      if (b.target !== best) { b.target = best; b.engagedAt = now; b.reactUntil = now + P.reaction * ctx.rng.range(0.7, 1.3) * (best.isBot ? 1 : 1.25); b.aimYaw = p.yaw; b.aimPitch = 0; }
       b.seenAt = now; b.lastSeen = { x: best.pos.x, y: best.pos.y, z: best.pos.z, id: best.id };
     } else if (b.target && now - b.seenAt > 0.8) b.target = null;
     // atacado por alguém que não vejo: vira para a direção do dano
@@ -217,7 +220,9 @@ export class BotSystem {
     const k = Math.min(1, P.track / 30);
     let dyaw = wantYaw - b.aimYaw; while (dyaw > Math.PI) dyaw -= Math.PI * 2; while (dyaw < -Math.PI) dyaw += Math.PI * 2;
     b.aimYaw += dyaw * k; b.aimPitch += (wantPitch - b.aimPitch) * k;
-    const err = P.aimError * (1 + Math.min(1.5, dist / 60)) * (now - b.seenAt > 0.3 ? 2 : 1);
+    // erro: distância, alvo se movendo, alvo recém-visto (aquecimento) e bot se movendo
+    const tSpeed = Math.hypot(t.vel?.x ?? 0, t.vel?.z ?? 0), warm = Math.max(0, 1 - (now - (b.engagedAt ?? now)) / P.warmup);
+    const err = P.aimError * (1 + Math.min(1.5, dist / 60)) * (now - b.seenAt > 0.3 ? 2 : 1) * (1 + Math.min(1, tSpeed / 6) * 0.8) * (1 + warm * 2.2) * (t.stance === 'crouch' ? 1.15 : 1);
     input.yaw = b.aimYaw + (ctx.rng() - 0.5) * err; input.pitch = b.aimPitch + (ctx.rng() - 0.5) * err;
     const def = w && ctx.cfg.weapons[w.id];
     input.ads = dist > 12;
@@ -230,8 +235,13 @@ export class BotSystem {
     input.mx = wx * c - wz * s; input.mz = wx * s + wz * c;
     const len = Math.hypot(input.mx, input.mz); if (len > 1) { input.mx /= len; input.mz /= len; }
     this.unstick(p, b, input, now);
+    // fumaça para se cobrir quando está apanhando
+    if (p.inv.tactical > 0 && p.hp < 45 && now > (b.smokeAt ?? 0) && dist > 8) { b.smokeAt = now + 20; this.send(p, C2S.TACTICAL, { yaw: wantYaw, pitch: -0.6 }); }
+    if (now < b.reactUntil) return;
+    // corpo a corpo / finalização quando colado no alvo
+    if (dist < 1.9 && Math.abs(t.pos.y - p.pos.y) < 1.2 && (t.is(PS.DOWNED) || !w || (w.mag === 0 && ctx.rng() < 0.3))) { this.send(p, C2S.MELEE, { yaw: wantYaw }); return; }
     // disparo em rajadas depois do tempo de reação
-    if (now < b.reactUntil || !def || p.action?.blocksFire) return;
+    if (!def || p.action?.blocksFire) return;
     if (w.mag === 0) { this.send(p, C2S.RELOAD, {}); return; }
     if (now < b.pauseUntil) return;
     if (b.burstLeft <= 0) b.burstLeft = ctx.rng.int(...P.burst);

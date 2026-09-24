@@ -91,6 +91,10 @@ export class AudioSystem {
     if (surface === 'hard') { this.burst({ freq: 1800, len: 0.04, vol: 0.14 * vol, type: 'bandpass', q: 2, pos }); this.burst({ freq: 300, len: 0.06, vol: 0.12 * vol, pos }); }
     else { this.burst({ freq: 700, len: 0.09, vol: 0.16 * vol, type: 'bandpass', q: 0.8, pos, attack: 0.01 }); this.burst({ freq: 200, len: 0.07, vol: 0.1 * vol, pos }); }
   }
+  whoosh(pos) { this.burst({ freq: 900, len: 0.22, vol: 0.35, type: 'bandpass', q: 1.5, attack: 0.08, pos }); }
+  stab() { this.burst({ freq: 400, len: 0.12, vol: 0.5 }); this.tone(160, 0.1, 0.15, 'sine'); }
+  smokePop(pos) { this.burst({ freq: 600, len: 0.25, vol: 0.5, pos }); this.burst({ freq: 3000, len: 2.2, vol: 0.18, type: 'highpass', pos, attack: 0.2 }); }
+  ping(kind) { this.tone(kind === 'enemy' ? 1320 : 990, 0.08, 0.08, 'sine'); setTimeout(() => this.tone(kind === 'enemy' ? 1760 : 1320, 0.1, 0.07, 'sine'), 80); }
   land(speed) { const k = Math.min(1, speed / 12); this.burst({ freq: 260, len: 0.18, vol: 0.3 + 0.4 * k }); this.burst({ freq: 900, len: 0.06, vol: 0.15 + 0.2 * k, type: 'bandpass' }); }
   reloadClick(stage) { this.tone(stage ? 1500 : 900, 0.03, 0.06, 'square'); this.burst({ freq: 2500, len: 0.03, vol: 0.12, type: 'highpass' }); }
   hit(head) { this.tone(head ? 2200 : 1700, 0.05, 0.09); }

@@ -23,6 +23,40 @@ export class HUDSystem {
   hitmarker(head, kill) { const h = $('hitmarker'); h.style.setProperty('--c', kill ? '#ff3b3b' : head ? '#ffd24d' : '#fff'); h.style.opacity = 1; this.hitT = performance.now() + (kill ? 300 : 120); }
   damageFrom(angle) { this.dirs.push({ angle, until: performance.now() + 700 }); }
   xp(text) { const el = document.getElementById('xpPop'), d = document.createElement('div'); d.textContent = text; el.appendChild(d); setTimeout(() => d.remove(), 1600); }
+  /** Marcadores no mundo (aliados, pings, contrato), projetados na tela; reaproveita os nós do DOM. */
+  markers(list, camera) {
+    const root = $('worldMarkers'), W = root.clientWidth, H = root.clientHeight; this.wmPool ??= [];
+    const v = this._v ??= camera.position.clone();
+    let n = 0;
+    for (const m of list) {
+      v.set(m.x, m.y, m.z).project(camera);
+      if (v.z > 1) { if (!m.edge) continue; v.x = -v.x; v.y = -1; }                    // atrás da câmera
+      let x = (v.x * 0.5 + 0.5) * W, y = (-v.y * 0.5 + 0.5) * H;
+      if (m.edge) { x = Math.max(24, Math.min(W - 24, x)); y = Math.max(40, Math.min(H - 24, y)); }
+      else if (x < 0 || x > W || y < 0 || y > H) continue;
+      let el = this.wmPool[n]; if (!el) { el = document.createElement('div'); root.appendChild(el); this.wmPool[n] = el; }
+      el.className = 'wm ' + m.cls; el.style.left = x + 'px'; el.style.top = y + 'px'; el.style.display = '';
+      const html = `<i></i>${m.label ?? ''}`; if (el._h !== html) { el.innerHTML = html; el._h = html; }
+      n++;
+    }
+    for (let i = n; i < this.wmPool.length; i++) this.wmPool[i].style.display = 'none';
+  }
+  damageNumber(x, y, amount, cls = '') {
+    const d = document.createElement('div'); d.className = 'dn ' + cls; d.textContent = Math.round(amount);
+    d.style.left = x + (Math.random() - 0.5) * 30 + 'px'; d.style.top = y + 'px'; $('dmgNumbers').appendChild(d); setTimeout(() => d.remove(), 800);
+  }
+  /** Painel de inventário (Tab): armas com raridade, equipamento, dinheiro e esquadrão. */
+  inventory(show, v) {
+    const el = $('inventory'); el.classList.toggle('hidden', !show); if (!show || !v) return;
+    const { inv, cfg, squad, you, rarColor } = v;
+    const slot = (k, label) => { const w = inv[k]; if (!w) return `<div class="inv-slot"><small>${label}</small>— vazio —</div>`;
+      const def = cfg.weapons[w.id], R = cfg.rarity?.[w.rarity] ?? {};
+      return `<div class="inv-slot" style="border-left-color:${rarColor[w.rarity] ?? '#888'}"><small>${label}${inv.active === k ? ' · EM MÃOS' : ''}</small><b>${def.name}</b> <span style="color:${rarColor[w.rarity]}">${R.label ?? w.rarity}</span><small>${w.mag} no pente · ${inv.ammo?.[def.ammo] ?? 0} reserva · dano ×${(R.damage ?? 1).toFixed(2)} · recuo ×${(R.recoil ?? 1).toFixed(2)}</small></div>`; };
+    el.innerHTML = `<h3>INVENTÁRIO</h3><div class="inv-grid">${slot('primary', 'PRIMÁRIA')}${slot('secondary', 'SECUNDÁRIA')}
+      <div class="inv-slot"><small>EQUIPAMENTO</small>🛡 ${inv.plates} placas · ✚ ${inv.heals} curas<br>💣 ${inv.lethal} granada · ☁ ${inv.tactical ?? 0} fumaça</div>
+      <div class="inv-slot"><small>DINHEIRO</small><b style="color:var(--green)">$${inv.cash}</b><small>☠ ${you.stats?.kills ?? 0} eliminações</small></div></div>
+      <h3 style="margin-top:12px">ESQUADRÃO</h3>${squad.map(m => `<div class="inv-slot" style="margin-top:4px"><b>${m.name}</b> <small>${STATE[m.state] ?? m.state}</small></div>`).join('') || '<small>sozinho</small>'}`;
+  }
   shotPing(x, z) { this.shots.push({ x, z, until: performance.now() + 1500 }); }
 
   buildCompass() {
@@ -66,7 +100,7 @@ export class HUDSystem {
     // arma
     if (inv) {
       const w = inv[inv.active], def = w && v.cfg.weapons[w.id], other = inv[inv.active === 'primary' ? 'secondary' : 'primary'];
-      $('weapon').innerHTML = `<div class="inv"><span>🛡 ${inv.plates}</span><span>✚ ${inv.heals}</span><span>💣 ${inv.lethal}</span></div>
+      $('weapon').innerHTML = `<div class="inv"><span>🛡 ${inv.plates}</span><span>✚ ${inv.heals}</span><span>💣 ${inv.lethal}</span><span>☁ ${inv.tactical ?? 0}</span></div>
         <div class="mag" style="color:${def && w.mag <= def.mag * 0.25 ? '#ff5050' : '#fff'}">${w?.mag ?? 0} <span class="res">/ ${def ? inv.ammo[def.ammo] : 0}</span></div>
         <div class="wn">${def?.name ?? '—'}</div><div class="other">${other ? v.cfg.weapons[other.id]?.name : '— slot vazio —'}</div>`;
     }
