@@ -21,7 +21,7 @@ const TRANSITIONS = {
   [PS.ALIVE]: [PS.DOWNED, ...AIR],
   [PS.DOWNED]: [PS.ALIVE, ...AIR],
   [PS.AWAITING_RESPAWN]: [PS.FREEFALL, PS.ELIMINATED],
-  [PS.ELIMINATED]: [],
+  [PS.ELIMINATED]: [PS.FREEFALL],   // só via recompra na estação (BuyStationSystem)
 };
 
 /** Estados em que o jogador ainda conta para a sobrevivência do squad. */

@@ -51,6 +51,8 @@ export class MatchStateSystem {
     const { ctx } = this, now = ctx.now();
     ctx.systems.squad.assignAll([...ctx.players.values()]);
     ctx.systems.loot.spawnInitial();
+    ctx.systems.contracts.spawnBoards();
+    ctx.systems.stations.spawnStations();
     ctx.systems.zone.start();
     this.createAircraft();
     for (const p of ctx.players.values()) {

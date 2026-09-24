@@ -28,7 +28,7 @@ function onMsg(m) {
       $('join').style.display = 'none'; $('help').style.display = 'block'; $('end').style.display = 'none';
       if (m.reconnected) announce('RECONECTADO', 2); else if (S.center.startsWith('CONEX')) announce('', 0); break;
     case S2C.LOBBY: S.lobby = m; S.snap = null; renderLobby(); break;
-    case S2C.MATCH_START: S.loot = new Map(m.loot.map(i => [i.id, i])); $('lobby').style.display = 'none'; announce('A AERONAVE DECOLOU — ESPAÇO PARA SALTAR', 4); break;
+    case S2C.MATCH_START: S.boards = new Map((m.boards ?? []).map(b => [b.id, b])); S.stations = m.stations ?? []; S.loot = new Map(m.loot.map(i => [i.id, i])); $('lobby').style.display = 'none'; announce('A AERONAVE DECOLOU — ESPAÇO PARA SALTAR', 4); break;
     case S2C.SNAPSHOT: S.snap = m; for (const o of m.others) { const r = S.render.get(o.id) ?? { x: o.x, z: o.z }; r.tx = o.x; r.tz = o.z; S.render.set(o.id, r); } break;
     case S2C.EVENT: onEvent(m); break;
     case S2C.ERROR: announce(`ERRO: ${m.error}`, 3); if (m.error === 'partida em andamento') { sessionStorage.removeItem('zr_token'); } break;
@@ -52,6 +52,12 @@ function onEvent(e) {
     case 'zoneClosing': announce('A ZONA ESTÁ FECHANDO', 2.5); break;
     case 'squadEliminated': if (S.snap?.you.squad === e.squadId) announce(`SEU SQUAD FOI ELIMINADO — #${e.placement}`, 5); break;
     case 'matchEnded': showEnd(e); break;
+    case 'contractBoard': { const b = S.boards?.get(e.id); if (b) b.taken = e.taken; break; }
+    case 'contractStarted': announce(`CONTRATO: ${e.contract.name}`, 3); break;
+    case 'contractCompleted': announce(`CONTRATO CONCLUÍDO +$${e.reward.cash} +${e.reward.xp}XP`, 3); break;
+    case 'contractFailed': announce(`CONTRATO: ${e.reason}`, 2.5); break;
+    case 'purchase': announce(`COMPRADO: ${e.name}`, 2); break;
+    case 'purchaseFailed': announce(`COMPRA: ${e.reason}`, 2); break;
     case 'explosion': S.boom = { ...e, t: performance.now() }; break;
   }
 }
@@ -69,6 +75,8 @@ addEventListener('keydown', e => {
   if (k === 'KeyG') send(C2S.THROW, aimAngles());
   if (k === 'BracketRight') send(C2S.SPECTATE, { dir: 1 });
   if (k === 'BracketLeft') send(C2S.SPECTATE, { dir: -1 });
+  if (k === 'KeyF') { const y = S.snap?.you; const b = y && [...(S.boards?.values() ?? [])].find(b => !b.taken && Math.hypot(b.x - y.x, b.z - y.z) < 2.5); if (b) send(C2S.CONTRACT, { boardId: b.id }); }
+  if (k === 'KeyB') toggleShop();
   if (k === 'KeyE') { const it = nearestLoot(); if (it) send(C2S.PICKUP, { lootId: it.id }); }
   if (k === 'Space') e.preventDefault();
 });
@@ -102,6 +110,15 @@ setInterval(() => {
 }, 1000 / 30);
 
 // ---------------- UI ----------------
+function nearStation() { const y = S.snap?.you; return y && (S.stations ?? []).find(s => Math.hypot(s.x - y.x, s.z - y.z) < 3); }
+function toggleShop() {
+  const el = $('shop'), st = nearStation();
+  if (el.style.display === 'block' || !st) { el.style.display = 'none'; if (!st) announce('APROXIME-SE DE UMA ESTAÇÃO', 1.5); return; }
+  const cat = S.cfg?.stations?.catalog ?? {};
+  el.innerHTML = `<b class="y">ESTAÇÃO ${st.id}</b> — $${S.snap.you.inv.cash}<br>` + Object.entries(cat).map(([id, it]) => `<button data-item="${id}" style="display:block;width:100%;margin-top:4px;text-align:left">${it.name} — $${it.price}<br><small>${it.desc}</small></button>`).join('');
+  el.style.display = 'block';
+  el.onclick = ev => { const b = ev.target.closest('[data-item]'); if (b) send(C2S.BUY, { stationId: st.id, item: b.dataset.item }); };
+}
 $('joinForm').onsubmit = e => { e.preventDefault(); connect($('name').value, $('party').value); };
 function announce(t, d) { S.center = t; S.centerT = performance.now() + d * 1000; }
 function feed(t, me) { S.feed.unshift({ t, me, at: performance.now() }); S.feed.length = Math.min(S.feed.length, 7); }
@@ -143,6 +160,9 @@ function renderHud() {
     <div>${def?.name ?? ''}</div>
     <div>🛡 ${inv.plates} • ✚ ${inv.heals} • 💣 ${inv.lethal} • <b style="color:#7cff6b">$${inv.cash}</b></div>
     <div class="muted" style="font-size:11px">munição: ${Object.entries(inv.ammo).map(([k, v]) => `${k} ${v}`).join(' · ')}</div>` : '';
+  const k = y.contract;
+  if (k) $('hud-l').innerHTML = `<div style="color:#e8b13a">📋 ${k.name} ${k.type === 'hunt' ? `— alvo: ${k.target}` : ''} ${k.goal > 1 ? `${Math.floor(k.progress)}/${k.goal}` : ''} ${k.contested ? '(CONTESTADO)' : ''} • ${k.timeLeft}s</div>` + $('hud-l').innerHTML;
+  if (y.radar) $('hud-l').innerHTML = '<div style="color:#ff6b6b">📡 RADAR ATIVO</div>' + $('hud-l').innerHTML;
   // estados especiais
   let msg = performance.now() < S.centerT ? S.center : '';
   if (y.s === 'awaiting') msg = `RETORNO EM ${Math.ceil(y.respawnIn)}s${y.spectating ? ' — assistindo aliado ([ / ])' : ''}`;
@@ -172,6 +192,11 @@ function draw() {
   g.save(); g.beginPath(); g.rect(0, 0, cv.width, cv.height); g.arc(zx, zy, Math.max(0.1, zn.r * Z), 0, Math.PI * 2, true); g.fillStyle = 'rgba(255,110,0,.28)'; g.fill(); g.restore();
   g.strokeStyle = '#ff8a2a'; g.lineWidth = 2; g.beginPath(); g.arc(zx, zy, Math.max(0.1, zn.r * Z), 0, 7); g.stroke();
   const [tx, ty] = W(zn.to.x, zn.to.z); g.setLineDash([6, 5]); g.strokeStyle = '#fff'; g.beginPath(); g.arc(tx, ty, Math.max(0.1, zn.to.r * Z), 0, 7); g.stroke(); g.setLineDash([]);
+  // estações e contratos
+  for (const st of S.stations ?? []) { const [a, b] = W(st.x, st.z); g.fillStyle = '#7cff6b'; g.fillRect(a - 5, b - 5, 10, 10); g.fillStyle = '#000'; g.font = 'bold 9px sans-serif'; g.fillText('$', a, b + 3); }
+  for (const bd of S.boards?.values() ?? []) { if (bd.taken) continue; const [a, b] = W(bd.x, bd.z); g.fillStyle = '#e8b13a'; g.beginPath(); g.moveTo(a, b - 6); g.lineTo(a + 5, b + 4); g.lineTo(a - 5, b + 4); g.fill(); }
+  const kc = s.you.contract;
+  if (kc) { g.strokeStyle = '#e8b13a'; g.lineWidth = 2; const pt = kc.lastSeen ?? kc.cache ?? kc.area; if (pt) { const [a, b] = W(pt.x, pt.z); g.beginPath(); g.arc(a, b, Math.max(6, (kc.area?.r ?? (kc.lastSeen ? 15 : 3)) * Z), 0, 7); g.stroke(); } g.lineWidth = 1; }
   // aeronave
   if (s.match.aircraft) { const a = s.match.aircraft, k = Math.min(1, a.t / a.duration); const [p0, q0] = W(a.start.x, a.start.z), [p1, q1] = W(a.end.x, a.end.z);
     g.strokeStyle = 'rgba(255,255,255,.4)'; g.setLineDash([10, 8]); g.beginPath(); g.moveTo(p0, q0); g.lineTo(p1, q1); g.stroke(); g.setLineDash([]);
@@ -184,6 +209,7 @@ function draw() {
   for (const o of s.others) {
     const r = S.render.get(o.id); r.x += (r.tx - r.x) * 0.35; r.z += (r.tz - r.z) * 0.35;
     const [a, b] = W(r.x, r.z), col = o.a ? '#7cff6b' : '#ff4a4a';
+    if (o.rv) { g.strokeStyle = '#ff6b6b'; g.beginPath(); g.arc(a, b, 10, 0, 7); g.stroke(); }
     g.fillStyle = o.s === 'downed' ? '#ffb13a' : col; g.beginPath(); g.arc(a, b, o.s === 'freefall' || o.s === 'parachute' ? 6 : 4.5, 0, 7); g.fill();
     g.strokeStyle = col; g.beginPath(); g.moveTo(a, b); g.lineTo(a - Math.sin(o.yaw) * 12, b - Math.cos(o.yaw) * 12); g.stroke();
     g.fillStyle = '#fff'; g.font = '11px sans-serif'; g.fillText(`${o.n}${o.a ? ` ${o.hp}/${o.ar}` : ''}${o.s !== 'alive' ? ` [${stateName[o.s]}]` : ''}${o.y > 1 ? ` ${Math.round(o.y)}m` : ''}`, a, b - 9);

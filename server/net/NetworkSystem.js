@@ -10,6 +10,14 @@ import { MS } from '../systems/MatchStateSystem.js';
  * snapshots periódicos por jogador, medição de latência (para lag compensation).
  * Nenhuma regra de jogo aqui.
  */
+/** Quem recebe cada evento: privacidade (involved/squad) e custo de banda (near). */
+const EVENT_SCOPE = {
+  damage: 'involved', pickup: 'involved', pickupFailed: 'involved', purchaseFailed: 'involved', respawnTimer: 'involved',
+  plateBroken: 'involved', reviveStarted: 'involved',
+  contractStarted: 'squad', contractUpdate: 'squad', contractCompleted: 'squad', contractFailed: 'squad', purchase: 'squad',
+  shot: 'near', explosion: 'near', slid: 'near', mantled: 'near', vaulted: 'near', landed: 'near',
+};
+
 export class NetworkSystem {
   constructor({ server, getMatch, cfg, logger }) {
     this.getMatch = getMatch; this.cfg = cfg; this.log = logger.child('net');
@@ -63,16 +71,24 @@ export class NetworkSystem {
 
   matchStartPayload(match) {
     const S = match.ctx.systems;
-    return { aircraft: S.match.aircraftInfo(), loot: S.loot.all(), zone: S.zone.view(), squads: S.squad.summary() };
+    return { aircraft: S.match.aircraftInfo(), loot: S.loot.all(), zone: S.zone.view(), squads: S.squad.summary(), boards: S.contracts.boardsView(), stations: S.stations.view() };
   }
 
   /** Eventos privados só vão para os envolvidos; o resto é broadcast. */
   onGameEvent(match, type, p) {
     if (type === 'matchStarted') { for (const s of this.sessions) if (s.player) this.send(s, S2C.MATCH_START, this.matchStartPayload(match)); return; }
-    const involves = s => [p.attackerId, p.victimId, p.playerId, p.reviverId].includes(s.player.id);
+    const players = match.ctx.players;
+    const involves = s => [p.attackerId, p.victimId, p.playerId, p.reviverId, p.targetId].includes(s.player.id);
+    const origin = p.x !== undefined ? p : players.get(p.playerId)?.pos;
     for (const s of this.sessions) {
       if (!s.player) continue;
-      if (type === 'damage' && !involves(s)) continue;
+      const rule = EVENT_SCOPE[type] ?? 'all';
+      if (rule === 'involved' && !involves(s)) continue;
+      if (rule === 'squad' && s.player.squadId !== p.squadId) continue;
+      if (rule === 'near') {
+        const vp = match.ctx.systems.spectator.viewpoint(s.player);
+        if (!origin || Math.hypot(origin.x - vp.x, origin.z - vp.z) > 220) continue;
+      }
       this.send(s, S2C.EVENT, { type, ...p });
     }
   }

@@ -139,6 +139,38 @@ export const CONFIG = {
     lethal: { name: 'Granada de Fragmentação', fuse: 2.2, radius: 8, maxDamage: 140, maxCarried: 2, throwSpeed: 19 },
   },
 
+  // ---------------- CONTRATOS (objetivos opcionais) ----------------
+  contracts: {
+    enabled: true,
+    boards: 18,                 // tablets espalhados no mapa
+    interactRange: 2.5,
+    maxActivePerSquad: 1,
+    respawnReduction: 10,       // s descontados de aliados aguardando retorno ao completar
+    types: {
+      hunt:      { name: 'Caçada',        weight: 3, duration: 120, reward: { cash: 1500, xp: 400 }, revealEvery: 8, searchRadius: 250 },
+      scavenger: { name: 'Suprimentos',   weight: 3, duration: 150, reward: { cash: 800, xp: 250, loot: 'epic' }, caches: 3, cacheRadius: 3, minDist: 35, maxDist: 80 },
+      capture:   { name: 'Domínio',       weight: 2, duration: 150, reward: { cash: 1200, xp: 350 }, radius: 10, time: 25, minDist: 40, maxDist: 90 },
+      survive:   { name: 'Resistência',   weight: 2, duration: 95,  reward: { cash: 1000, xp: 300 }, time: 90 },
+      collect:   { name: 'Inteligência',  weight: 2, duration: 150, reward: { cash: 900, xp: 300 }, items: 3, radius: 55 },
+    },
+  },
+
+  // ---------------- ESTAÇÕES DE COMPRA ----------------
+  stations: {
+    enabled: true,
+    interactRange: 3,
+    buybackUntilPhase: 5,       // recompra de aliado permitida até esta fase (1-based)
+    catalog: {
+      plates:  { name: 'Pacote de Placas (3)', price: 800,  desc: '+3 placas' },
+      ammo:    { name: 'Munição',              price: 400,  desc: 'Recarrega munição das armas' },
+      heal:    { name: 'Adrenalina',           price: 500,  desc: '+1 item de cura' },
+      lethal:  { name: 'Granada',              price: 600,  desc: '+1 granada' },
+      radar:   { name: 'Radar Portátil',       price: 3000, desc: 'Revela inimigos próximos ao squad por 30s', duration: 30, radius: 150 },
+      weapon:  { name: 'Carcará AR',           price: 2000, desc: 'Fuzil de assalto', weaponId: 'rifle' },
+      buyback: { name: 'Kit de Retorno',       price: 4500, desc: 'Traz um aliado de volta agora', perMatchLimit: 3 },
+    },
+  },
+
   // ---------------- REDE / ANTI-ABUSO ----------------
   network: {
     port: Number(globalThis.process?.env?.PORT) || 8080,
@@ -158,6 +190,7 @@ export function clientConfig(cfg = CONFIG) {
     health: cfg.health,
     downed: cfg.downed,
     resurgence: { enabled: cfg.resurgence.enabled, disableAtPhase: cfg.resurgence.disableAtPhase },
+    contracts: cfg.contracts, stations: cfg.stations, loot: { pickupRange: cfg.loot.pickupRange },
     weapons: cfg.weapons,
     network: { interpolationDelay: cfg.network.interpolationDelay },
   };

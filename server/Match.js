@@ -20,6 +20,8 @@ import { RespawnSystem } from './systems/RespawnSystem.js';
 import { SafeZoneSystem } from './systems/SafeZoneSystem.js';
 import { SpectatorSystem } from './systems/SpectatorSystem.js';
 import { BotSystem } from './systems/BotSystem.js';
+import { ContractSystem } from './systems/ContractSystem.js';
+import { BuyStationSystem } from './systems/BuyStationSystem.js';
 
 const BOT_NAMES = ['Aurora', 'Bento', 'Caju', 'Dara', 'Elo', 'Fumaça', 'Guará', 'Hélio', 'Iara', 'Jambo', 'Kiko', 'Lume', 'Maré', 'Nado', 'Onça', 'Pipa', 'Quartzo', 'Raio', 'Sabiá', 'Tupã', 'Urso', 'Vento', 'Xamã', 'Zepa'];
 
@@ -56,6 +58,8 @@ export class Match {
     S.respawn = new RespawnSystem(ctx);
     S.zone = new SafeZoneSystem(ctx);
     S.spectator = new SpectatorSystem(ctx);
+    S.contracts = new ContractSystem(ctx);
+    S.stations = new BuyStationSystem(ctx);
     S.bots = new BotSystem(ctx, this);
     this.nextId = 1;
     this.tokens = new Map();   // token → playerId (reconexão)
@@ -127,6 +131,8 @@ export class Match {
       case C2S.USE_PLATE: S.inventory.requestPlate(p); break;
       case C2S.USE_HEAL: S.inventory.requestHeal(p); break;
       case C2S.DEPLOY_CHUTE: if (p.is(PS.FREEFALL)) p.setState(PS.PARACHUTE, this.ctx.now()); break;
+      case C2S.CONTRACT: S.contracts.requestStart(p, msg.boardId); break;
+      case C2S.BUY: S.stations.requestBuy(p, { stationId: String(msg.stationId), item: String(msg.item), targetId: msg.targetId ? String(msg.targetId) : undefined }); break;
       case C2S.SPECTATE: S.spectator.cycle(p, msg.dir === -1 ? -1 : 1); break;
       default: this.ctx.log.debug(`mensagem desconhecida ${msg.t}`);
     }
@@ -146,6 +152,7 @@ export class Match {
     S.health.tick(dt);
     S.zone.tick(dt);
     S.resurgence.tick(dt);
+    S.contracts.tick(dt);
     S.loot.tick(dt);
     S.spectator.tick(dt);
     this.tickDisconnects();
@@ -172,14 +179,14 @@ export class Match {
 
   /** Snapshot filtrado por interesse: dados privados só do próprio jogador. */
   snapshotFor(p) {
-    const { ctx } = this, S = ctx.systems, r = ctx.cfg.network.interestRadius, vp = S.spectator.viewpoint(p);
+    const { ctx } = this, S = ctx.systems, r = ctx.cfg.network.interestRadius, vp = S.spectator.viewpoint(p), radar = S.stations.radarFor(p.squadId);
     const others = [];
     for (const o of ctx.players.values()) {
       if (o === p || !o.is(...IN_PLAY, PS.DOWNED)) continue;
       const ally = S.squad.areAllies(o, p);
       if (!ally && Math.hypot(o.pos.x - vp.x, o.pos.z - vp.z) > r) continue;
       others.push({ id: o.id, n: o.name, sq: o.squadId, a: ally ? 1 : 0, s: o.state, x: +o.pos.x.toFixed(2), y: +o.pos.y.toFixed(2), z: +o.pos.z.toFixed(2),
-        yaw: +o.yaw.toFixed(3), pitch: +o.pitch.toFixed(3), st: o.stance, w: S.inventory.active(o)?.id ?? null, ...(ally ? { hp: Math.round(o.hp), ar: Math.round(o.armor) } : {}) });
+        yaw: +o.yaw.toFixed(3), pitch: +o.pitch.toFixed(3), st: o.stance, w: S.inventory.active(o)?.id ?? null, sl: o.slide ? 1 : 0, mt: o.mantle || o.climb ? 1 : 0, ...(!ally && radar && Math.hypot(o.pos.x - p.pos.x, o.pos.z - p.pos.z) <= radar ? { rv: 1 } : {}), ...(ally ? { hp: Math.round(o.hp), ar: Math.round(o.armor) } : {}) });
     }
     const w = p.inv && S.inventory.active(p);
     const alive = [...ctx.players.values()].filter(o => o.is(...IN_PLAY, PS.DOWNED)).length;
@@ -195,6 +202,8 @@ export class Match {
         respawnIn: p.is(PS.AWAITING_RESPAWN) ? +p.respawnRemaining.toFixed(1) : null,
         spectating: p.spectating, stats: p.stats, squad: p.squadId,
         zone: S.zone.distanceInfo(p.pos),
+        contract: S.contracts.viewFor(p), radar: radar > 0,
+        vy: +p.vel.y.toFixed(3), grounded: p.grounded, slide: p.slide, mantle: p.mantle, climb: p.climb, stamBlock: +(p.staminaBlockUntil - ctx.now()).toFixed(2), slideCd: +(p.slideCooldownUntil - ctx.now()).toFixed(2), tac: p.tacActive, pj: p.prevJump, pc: p.prevCrouch, yaw: +p.yaw.toFixed(3), sprinting: p.sprinting,
       },
       squad: p.squadId ? S.squad.statusFor(p) : [],
       others,

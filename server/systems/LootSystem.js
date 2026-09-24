@@ -79,6 +79,7 @@ export class LootSystem {
       case 'plate': return inv.addPlates(p, d.amount);
       case 'cash': inv.addCash(p, d.amount, 'loot'); return true;
       case 'heal': if (p.inv.heals >= this.ctx.cfg.health.healItem.maxCarried) return false; p.inv.heals++; return true;
+      case 'intel': return this.ctx.systems.contracts.canPickIntel(p, d);
       case 'lethal': if (p.inv.lethal >= this.ctx.cfg.equipment.lethal.maxCarried) return false; p.inv.lethal++; return true;
     }
     return false;
