@@ -84,7 +84,7 @@ export class Match {
       onStateChange: (pl, from, to, info) => { ctx.log.debug(`${pl.name}: ${from} → ${to}`, info); ctx.bus.emit('playerState', { playerId: pl.id, from, to, info }); },
     });
     p.party = party ? String(party).slice(0, 12).toUpperCase() : null;
-    p.operator = Number.isInteger(operator) && operator >= 0 && operator < 16 ? operator : null;
+    p.operator = Number.isInteger(operator) && operator >= 0 && operator < 16 ? operator : isBot ? Math.floor(ctx.rng() * 4) : 0;
     ctx.players.set(p.id, p); this.tokens.set(p.token, p.id);
     ctx.log.info(`${p.name}${isBot ? ' (bot)' : ''} entrou (${ctx.players.size})`);
     ctx.bus.emit('lobbyChanged', {});
@@ -190,7 +190,7 @@ export class Match {
       const ally = S.squad.areAllies(o, p);
       if (!ally && Math.hypot(o.pos.x - vp.x, o.pos.z - vp.z) > r) continue;
       others.push({ id: o.id, n: o.name, sq: o.squadId, a: ally ? 1 : 0, s: o.state, x: +o.pos.x.toFixed(2), y: +o.pos.y.toFixed(2), z: +o.pos.z.toFixed(2),
-        yaw: +o.yaw.toFixed(3), pitch: +o.pitch.toFixed(3), st: o.stance, w: S.inventory.active(o)?.id ?? null, sl: o.slide ? 1 : 0, mt: o.mantle || o.climb ? 1 : 0, ...(!ally && radar && Math.hypot(o.pos.x - p.pos.x, o.pos.z - p.pos.z) <= radar ? { rv: 1 } : {}), ...(ally ? { hp: Math.round(o.hp), ar: Math.round(o.armor) } : {}) });
+        yaw: +o.yaw.toFixed(3), pitch: +o.pitch.toFixed(3), st: o.stance, w: S.inventory.active(o)?.id ?? null, wr: S.inventory.active(o)?.rarity ?? null, sl: o.slide ? 1 : 0, mt: o.mantle ? 1 : o.climb ? 2 : 0, spr: o.sprinting ? (o.tacActive ? 2 : 1) : 0, ads: o.ads ? 1 : 0, gr: o.grounded ? 1 : 0, ac: o.action?.type ?? null, op: o.operator ?? 0, ...(!ally && radar && Math.hypot(o.pos.x - p.pos.x, o.pos.z - p.pos.z) <= radar ? { rv: 1 } : {}), ...(ally ? { hp: Math.round(o.hp), ar: Math.round(o.armor) } : {}) });
     }
     const w = p.inv && S.inventory.active(p);
     const alive = [...ctx.players.values()].filter(o => o.is(...IN_PLAY, PS.DOWNED)).length;

@@ -6,7 +6,7 @@ import { Interpolation } from './Interpolation.js';
 import { Avatars } from '../render/Avatars.js';
 import { ViewModel } from '../render/ViewModel.js';
 import { Effects } from '../render/Effects.js';
-import { soldierModel, OPERATOR_STYLES } from '../render/Models.js';
+import { characters } from '../render/characters/CharacterFactory.js';
 import { assets } from '../assets/AssetManager.js';
 import { settings } from '../core/Settings.js';
 
@@ -27,7 +27,7 @@ export class GameSession {
     const { world } = app;
     this.world = world; this.hud = app.hud; this.audio = app.audio; this.input = app.input;
     this.avatars = new Avatars(world.scene); this.effects = new Effects(world.scene); this.vm = new ViewModel(world.camera);
-    this.self = soldierModel(OPERATOR_STYLES[0]); this.self.visible = false; world.scene.add(this.self);
+    this.self = null;   // próprio operador em 3ª pessoa (criado quando os modelos estiverem prontos)
     Object.assign(this, { id: null, cfg: null, mapView: null, geo: null, pred: null, interp: null, snap: null, inMatch: false, ended: false,
       boards: new Map(), stations: [], seq: 0, acc: 0, nextFire: 0, shotsSinceSnap: 0, shopOpen: false, hurtT: 0, shake: 0, waitingAssets: false });
     this.offs = [];
@@ -56,7 +56,7 @@ export class GameSession {
   // ------------------------------------------------------------ rede
   onWelcome(m) {
     this.id = m.id; if (m.config) this.cfg = m.config;
-    if (m.map) { this.mapView = m.map; this.geo = MapGeometry.fromView(m.map); this.world.buildMap(m.map, this.geo); }
+    if (m.map) { this.mapView = m.map; this.geo = MapGeometry.fromView(m.map); this.world.buildMap(m.map, this.geo); this.avatars.setGeo(this.geo); }
     this.pred = new Prediction(this.cfg, this.geo); this.interp = new Interpolation(this.cfg.network.interpolationDelay);
     if (m.reconnected) this.hud.notify('RECONECTADO À PARTIDA', 3);
     // offline: congela a simulação até os modelos 3D chegarem (a partida espera por você)
@@ -75,6 +75,8 @@ export class GameSession {
     this.inMatch = true; this.ended = false;
     this.app.menu.show(false); this.app.showLoading(false); this.hud.show(true); $('end').classList.add('hidden');
     this.world.startMatch(p); this.avatars.clear();
+    if (this.self) { this.world.scene.remove(this.self.root, this.self.weapon); }
+    this.self = characters.create({ operator: settings.get('operator') }); this.world.scene.add(this.self.root, this.self.weapon); this.self.root.visible = false;
     this.boards = new Map((p.boards ?? []).map(b => [b.id, b])); this.stations = p.stations ?? [];
     this.input.enabled = true; this.input.resetToggles();
     this.hud.announce('A AERONAVE DECOLOU', 3); this.audio.warn();
@@ -105,7 +107,7 @@ export class GameSession {
       case 'lootSpawned': this.world.addLoot(e.item); break;
       case 'lootRemoved': this.world.removeLoot(e.id); break;
       case 'contractBoard': { const b = this.boards.get(e.id); if (b) b.taken = e.taken; this.world.setBoard(e.id, e.taken); break; }
-      case 'killfeed': h.killfeed(`${e.attacker ?? '☣ zona'} ✖ ${e.victim}`, e.attackerId === me || e.victimId === me || this.isAlly(e.victimId)); if (e.attackerId === me) { h.hitmarker(false, true); a.kill(); h.xp('+100 ELIMINAÇÃO'); } break;
+      case 'killfeed': this.avatars.kill(e.victimId); h.killfeed(`${e.attacker ?? '☣ zona'} ✖ ${e.victim}`, e.attackerId === me || e.victimId === me || this.isAlly(e.victimId)); if (e.attackerId === me) { h.hitmarker(false, true); a.kill(); h.xp('+100 ELIMINAÇÃO'); } break;
       case 'damage':
         if (e.attackerId === me) { h.hitmarker(e.part === 'head', false); a.hit(e.part === 'head'); if (e.armorBroken) a.crack(); }
         if (e.victimId === me) { this.hurtT = performance.now(); if (e.fromX !== undefined && e.source !== 'zone') h.damageFrom(Math.atan2(e.fromX - this.pred.body.pos.x, -(e.fromZ - this.pred.body.pos.z))); }
@@ -119,6 +121,7 @@ export class GameSession {
       case 'squadEliminated': if (this.snap?.you.squad === e.squadId) h.announce(`SQUAD ELIMINADO — #${e.placement}`, 5); break;
       case 'shot': {
         if (e.playerId === me) break;
+        this.avatars.fire(e.playerId);
         a.shot(e.weapon, e);
         const d = { x: -Math.sin(e.yaw) * Math.cos(e.pitch), y: Math.sin(e.pitch), z: -Math.cos(e.yaw) * Math.cos(e.pitch) };
         const end = e.hit ?? { x: e.x + d.x * 60, y: e.y + d.y * 60, z: e.z + d.z * 60 };
@@ -225,7 +228,7 @@ export class GameSession {
     if (input.fire) this.tryFire(false);
 
     const others = this.interp.sample(serverNow);
-    this.avatars.update(others, dt, time);
+    this.avatars.update(others, dt, this.world.camera.position);
     const pos = this.pred.renderPos(this.acc / STEP, dt), body = this.pred.body;
     const inv = y.inv, w = inv?.[inv.active];
 
@@ -256,8 +259,11 @@ export class GameSession {
     cam.fov += (fov - cam.fov) * Math.min(1, dt * 12); cam.updateProjectionMatrix();
     input.zoomScale = sniper ? 0.35 : 1;
 
-    this.self.visible = ['freefall', 'parachute'].includes(st);
-    if (this.self.visible) { this.self.position.set(pos.x, pos.y, pos.z); this.self.rotation.y = input.yaw; this.self.userData.chute.visible = st === 'parachute'; this.self.userData.body.rotation.x = st === 'freefall' ? -1.25 : 0; }
+    if (this.self) {
+      const show = ['freefall', 'parachute'].includes(st);
+      this.self.root.visible = show; this.self.weapon.visible = false;
+      if (show) this.self.animator.update(dt, { x: pos.x, y: pos.y, z: pos.z, yaw: input.yaw, pitch: 0, vx: body.vel.x, vz: body.vel.z, state: st, stance: 'stand', grounded: false, weapon: null });
+    }
 
     this.vm.setWeapon(st === 'alive' ? w?.id ?? null : null);
     this.vm.update(dt, { ads: y.ads, sprint: body.sprinting, moving: Math.hypot(body.vel.x, body.vel.z) > 1 && body.grounded, action: y.action?.type, visible: st === 'alive', sniperScope: sniper });
@@ -299,7 +305,7 @@ export class GameSession {
     this.input.removeEventListener('action', this.onAction);
     removeEventListener('keydown', this.keyTab); removeEventListener('keyup', this.keyTab);
     $('shop').removeEventListener('click', this.shopClick); $('shop').classList.add('hidden'); $('bigmap').classList.add('hidden');
-    this.avatars.clear(); this.world.scene.remove(this.self); this.vm.root.parent?.remove(this.vm.root);
+    this.avatars.clear(); if (this.self) this.world.scene.remove(this.self.root, this.self.weapon); this.vm.root.parent?.remove(this.vm.root);
     this.world.clearMatch?.();
   }
 }

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="pt-BR"><head><meta charset="UTF-8"><title>Teste de personagens</title>
+<style>body{margin:0;background:#222;overflow:hidden;font:12px sans-serif;color:#fff} #lbl{position:fixed;top:6px;left:8px}</style></head>
+<body><div id="lbl">carregando…</div>
+<script type="importmap">{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/" } }</script>
+<script type="module">
+import * as THREE from 'three';
+import { assets } from '../client/assets/AssetManager.js';
+import { characters } from '../client/render/characters/CharacterFactory.js';
+/** Mostra personagens em vários estados. ?cam=frente|lado|cima  &t=segundos simulados */
+const q = new URLSearchParams(location.search);
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(innerWidth, innerHeight); r.shadowMap.enabled = true; document.body.appendChild(r.domElement);
+const scene = new THREE.Scene(); scene.background = new THREE.Color(0x9fb3c4);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x445544, 1.1));
+const sun = new THREE.DirectionalLight(0xffffff, 1.8); sun.position.set(-6, 12, 8); sun.castShadow = true; Object.assign(sun.shadow.camera, { left: -15, right: 15, top: 15, bottom: -15 }); scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(80, 80), new THREE.MeshStandardMaterial({ color: 0x6f7342 })); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+const cam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 200);
+const STATES = [
+  ['parado', { state: 'alive', stance: 'stand' }], ['mirando', { state: 'alive', stance: 'stand', ads: 1, pitch: 0.2 }], ['andando', { state: 'alive', v: 3 }],
+  ['correndo', { state: 'alive', v: 8.5, sprint: 1 }], ['tático', { state: 'alive', v: 10.8, sprint: 2 }], ['agachado', { state: 'alive', stance: 'crouch' }],
+  ['deitado', { state: 'alive', stance: 'prone' }], ['recarga', { state: 'alive', action: 'reload' }], ['placa', { state: 'alive', action: 'plate' }],
+  ['slide', { state: 'alive', v: 9, slide: 1 }], ['no ar', { state: 'alive', grounded: false }], ['queda livre', { state: 'freefall', y: 1.2 }],
+  ['paraquedas', { state: 'parachute', y: 1.0 }], ['abatido', { state: 'downed' }], ['morto', { state: 'dead' }], ['pistola', { state: 'alive', weapon: 'sidearm', v: 2 }],
+];
+await assets.wait(20000);
+const only = q.get('only'); const chosen = only ? only.split(',').map(Number) : null;
+const list = STATES.filter((_, i) => !chosen || chosen.includes(i)).map(([label, s], j) => { const i = chosen ? j : j;
+  const c = characters.create({ operator: i % 4 }); scene.add(c.root, c.weapon); c.setWeapon(s.state === 'alive' || s.state === 'downed' ? (s.weapon ?? 'rifle') : null);
+  return chosen ? { c, s, label, x: (j - (chosen.length - 1) / 2) * 2.4, z: 0 } : { c, s, label, x: (i % 8) * 2.2 - 7.7, z: Math.floor(i / 8) * -3.5 };
+});
+document.getElementById('lbl').textContent = `${characters.stats.real ? 'MODELO REAL (Higgsfield)' : 'humanoide procedural'} · ` + list.map(l => l.label).join(' | ');
+const T = Number(q.get('t') ?? 1.3); let t = 0; const dt = 1 / 60;
+function step(d) { for (const l of list) { const s = l.s, v = s.v ?? 0; l.c.animator.update(d, { x: l.x, y: s.y ?? 0, z: l.z, yaw: 0, pitch: s.pitch ?? 0, vx: 0, vz: -v, state: s.state, stance: s.stance ?? 'stand', sprint: s.sprint ?? 0, ads: s.ads ?? 0, slide: s.slide ?? 0, mantle: 0, grounded: s.grounded ?? true, action: s.action ?? null, weapon: l.c.weaponId }); } }
+while (t < T) { step(dt); t += dt; }
+const mode = q.get('cam') ?? 'frente';
+if (mode === 'frente') { cam.position.set(0, 3.2, 12); cam.lookAt(0, 0.6, -1.8); }
+else if (mode === 'lado') { cam.position.set(14, 2.2, -1.5); cam.lookAt(0, 0.8, -1.8); }
+else if (mode === 'rosto') { cam.position.set(1.5, 1.6, -5.5); cam.lookAt(0, 0.9, 0); }
+else if (mode === 'perfil') { cam.position.set(5.5, 1.3, 0); cam.lookAt(0, 0.9, 0); }
+else { cam.position.set(0, 16, 2); cam.lookAt(0, 0, -2); }
+function loop() { requestAnimationFrame(loop); if (!q.get('freeze')) step(1 / 60); r.render(scene, cam); }
+loop(); window.ready = true;
+</script></body></html>
