@@ -38,7 +38,8 @@ export class Player {
     this.connected = true; this.disconnectedAt = 0; this.ready = false;
     this.pos = { x: 0, y: 0, z: 0 }; this.vel = { x: 0, y: 0, z: 0 };
     this.yaw = 0; this.pitch = 0; this.stance = 'stand'; this.grounded = true; this.ads = false;
-    this.stamina = 100; this.staminaBlockUntil = 0;
+    this.stamina = 100; this.staminaBlockUntil = 0; this.tacActive = false; this.sprinting = false;
+    this.slide = null; this.mantle = null; this.climb = null; this.prevCrouch = false; this.prevJump = false; this.slideCooldownUntil = 0;
     this.input = { mx: 0, mz: 0, yaw: 0, pitch: 0, sprint: false, tac: false, crouch: false, prone: false, jump: false, ads: false, interact: false };
     this.lastSeq = 0; this.latency = 0.05;
     this.hp = 100; this.armor = 0; this.bleed = 0; this.lastDamageAt = -99; this.lastAttacker = null;

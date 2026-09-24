@@ -1,15 +1,16 @@
 import { PS } from '../Player.js';
 import { clamp } from '../core/math.js';
+import { stepGround, stepAir, stepCrawl } from '../../shared/movement.js';
 
 /**
  * MovementSystem (autoritativo)
  * O cliente envia apenas intenção (mx/mz, botões, yaw/pitch). O servidor
- * integra a física, então speed-hack/teleporte não são possíveis: o máximo
- * que um cliente malicioso consegue é "apertar as teclas" perfeitamente.
+ * integra a física usando `shared/movement.js` — o MESMO código que o cliente
+ * usa para predição. Speed hack/teleporte não são possíveis.
  *
- * Estado atual (etapa 1): andar, sprint, sprint tático com stamina,
- * agachar, prone, pular, queda livre e paraquedas.
- * Etapa 2 adiciona slide, mantle/vault e escalada usando `ctx.map`.
+ * Suporta: andar, sprint, sprint tático (stamina), agachar, prone, slide,
+ * pulo, mantle, vault, escalada, telhados, queda livre, paraquedas, rastejar abatido.
+ * Eventos: landed, slid, mantled, vaulted
  */
 export class MovementSystem {
   constructor(ctx) { this.ctx = ctx; }
@@ -28,72 +29,42 @@ export class MovementSystem {
     };
   }
 
+  /**
+   * Cada input do cliente carrega seu próprio dt e vira UM passo de física (igual à
+   * predição do cliente). O "orçamento" de tempo só cresce com o relógio do servidor:
+   * mandar inputs mais rápido não faz ninguém andar mais rápido (anti speed-hack).
+   */
   tick(dt) {
     const now = this.ctx.now();
     for (const p of this.ctx.players.values()) {
-      p.yaw = p.input.yaw; p.pitch = p.input.pitch;
-      switch (p.state) {
-        case PS.FREEFALL: this.air(p, dt, this.ctx.cfg.movement.freefallSpeed, this.ctx.cfg.movement.freefallHorizontal); break;
-        case PS.PARACHUTE: this.air(p, dt, this.ctx.cfg.movement.parachuteSpeed, this.ctx.cfg.movement.parachuteHorizontal); break;
-        case PS.ALIVE: this.ground(p, dt, now); break;
-        case PS.DOWNED: this.crawl(p, dt); break;
-        default: break;
+      p.moveBudget = Math.min(0.3, (p.moveBudget ?? 0) + dt);
+      let steps = 0;
+      while (p.inputQueue?.length && p.moveBudget >= p.inputQueue[0].dt - 1e-4 && steps < 8) {
+        const inp = p.inputQueue.shift();
+        p.moveBudget -= inp.dt; p.input = inp; if (inp.seq) p.lastSeq = inp.seq;
+        this.step(p, inp, inp.dt, now); steps++;
       }
-      if (p.is(PS.FREEFALL, PS.PARACHUTE, PS.ALIVE, PS.DOWNED)) this.clampToMap(p);
+      // sem inputs chegando (lag/idle/desconectado): continua simulando com o último
+      if (!steps && !p.inputQueue?.length && p.moveBudget >= 0.15) { p.moveBudget -= dt; this.step(p, p.input, dt, now); }
       p.record(now);
     }
   }
 
-  wishDir(p) {
-    const s = Math.sin(p.yaw), c = Math.cos(p.yaw);
-    // frente = (-sin, -cos); direita = (cos, -sin)
-    return { x: -s * -p.input.mz + c * p.input.mx, z: -c * -p.input.mz - s * p.input.mx };
+  step(p, input, dt, now) {
+    const { ctx } = this, m = ctx.cfg.movement, geo = ctx.map;
+    p.pitch = input.pitch;
+    let ev = {};
+    switch (p.state) {
+      case PS.AIRCRAFT: p.yaw = input.yaw; break;
+      case PS.FREEFALL:
+        ev = stepAir(p, input, dt, m.freefallSpeed, m.freefallHorizontal, ctx.cfg, geo);
+        if (!ev.landed && ((input.jump && now - p.sm.enteredAt > 0.5) || p.pos.y - geo.groundHeight(p.pos.x, p.pos.z, p.pos.y) <= m.autoChuteHeight)) p.setState(PS.PARACHUTE, now);
+        break;
+      case PS.PARACHUTE: ev = stepAir(p, input, dt, m.parachuteSpeed, m.parachuteHorizontal, ctx.cfg, geo); break;
+      case PS.ALIVE: ev = stepGround(p, input, dt, now, ctx.cfg, geo, { slow: p.action?.slow, blocksAds: p.action?.blocksAds }); break;
+      case PS.DOWNED: stepCrawl(p, input, dt, ctx.cfg.downed.moveSpeed, ctx.cfg, geo); break;
+    }
+    if (ev.landed && p.is(PS.FREEFALL, PS.PARACHUTE)) { p.setState(PS.ALIVE, now); p.prevJump = true; }
+    for (const k of ['landed', 'slid', 'mantled', 'vaulted']) if (ev[k]) ctx.bus.emit(k, { playerId: p.id });
   }
-
-  air(p, dt, fall, horiz) {
-    const m = this.ctx.cfg.movement, w = this.wishDir(p);
-    p.vel.x += (w.x * horiz - p.vel.x) * Math.min(1, 2 * dt);
-    p.vel.z += (w.z * horiz - p.vel.z) * Math.min(1, 2 * dt);
-    p.vel.y = -fall;
-    p.pos.x += p.vel.x * dt; p.pos.z += p.vel.z * dt; p.pos.y += p.vel.y * dt;
-    if (p.is(PS.FREEFALL) && (p.input.jump && p.sm.enteredAt < this.ctx.now() - 0.5 || p.pos.y <= m.autoChuteHeight)) p.setState(PS.PARACHUTE, this.ctx.now());
-    const ground = this.ctx.map.groundHeight(p.pos.x, p.pos.z);
-    if (p.pos.y <= ground) { p.pos.y = ground; p.vel.y = 0; p.grounded = true; p.setState(PS.ALIVE, this.ctx.now()); this.ctx.bus.emit('landed', { playerId: p.id }); }
-  }
-
-  ground(p, dt, now) {
-    const m = this.ctx.cfg.movement, i = p.input;
-    p.stance = i.prone ? 'prone' : i.crouch ? 'crouch' : 'stand';
-    p.ads = i.ads && !p.action?.blocksAds;
-    const moving = Math.hypot(i.mx, i.mz) > 0.1, forward = i.mz < -0.3;
-    // stamina do sprint tático
-    let tac = i.tac && forward && p.stance === 'stand' && !p.ads && now >= p.staminaBlockUntil && (p.stamina > m.stamina.minToStart || p.tacActive);
-    if (tac) { p.stamina -= m.stamina.tacticalDrain * dt; if (p.stamina <= 0) { p.stamina = 0; tac = false; p.staminaBlockUntil = now + m.stamina.regenDelay; } }
-    else if (now >= p.staminaBlockUntil) p.stamina = Math.min(m.stamina.max, p.stamina + m.stamina.regen * dt);
-    p.tacActive = tac;
-    const sprint = !tac && i.sprint && forward && p.stance !== 'prone' && !p.ads;
-    if (sprint || tac) p.stance = 'stand';
-    let speed = tac ? m.tacticalSprint : sprint ? m.sprint : p.stance === 'prone' ? m.prone : p.stance === 'crouch' ? m.crouch : p.ads ? m.ads : m.walk;
-    if (p.action?.slow) speed *= p.action.slow;
-    p.sprinting = sprint || tac;
-    const w = this.wishDir(p), accel = p.grounded ? 14 : 3;
-    p.vel.x += (w.x * speed * (moving ? 1 : 0) - p.vel.x) * Math.min(1, accel * dt);
-    p.vel.z += (w.z * speed * (moving ? 1 : 0) - p.vel.z) * Math.min(1, accel * dt);
-    if (i.jump && p.grounded && p.stance === 'stand') { p.vel.y = m.jumpVelocity; p.grounded = false; }
-    p.vel.y -= m.gravity * dt;
-    p.pos.x += p.vel.x * dt; p.pos.z += p.vel.z * dt; p.pos.y += p.vel.y * dt;
-    this.ctx.map.resolve(p);
-    const g = this.ctx.map.groundHeight(p.pos.x, p.pos.z);
-    if (p.pos.y <= g) { p.pos.y = g; p.vel.y = 0; p.grounded = true; }
-  }
-
-  crawl(p, dt) {
-    const w = this.wishDir(p), s = this.ctx.cfg.downed.moveSpeed;
-    p.stance = 'prone'; p.vel.x = w.x * s; p.vel.z = w.z * s;
-    p.pos.x += p.vel.x * dt; p.pos.z += p.vel.z * dt;
-    this.ctx.map.resolve(p);
-    p.pos.y = this.ctx.map.groundHeight(p.pos.x, p.pos.z);
-  }
-
-  clampToMap(p) { const h = this.ctx.cfg.map.size / 2 - 1; p.pos.x = clamp(p.pos.x, -h, h); p.pos.z = clamp(p.pos.z, -h, h); }
 }

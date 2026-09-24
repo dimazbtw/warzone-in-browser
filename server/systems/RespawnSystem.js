@@ -36,7 +36,7 @@ export class RespawnSystem {
     ctx.systems.inventory.init(p, 'respawn');
     p.hp = ctx.cfg.health.max; p.bleed = 0; p.lastAttacker = null; p.lastDamageAt = -99;
     p.pos.x = pos.x; p.pos.z = pos.z; p.pos.y = ctx.cfg.resurgence.respawnAltitude;
-    p.vel.x = p.vel.y = p.vel.z = 0; p.respawnRemaining = 0; p.spectating = null;
+    p.vel.x = p.vel.y = p.vel.z = 0; p.mantle = p.climb = p.slide = null; p.respawnRemaining = 0; p.spectating = null;
     p.history.fill(undefined);
     p.setState(PS.FREEFALL, now, { respawn: true });
     ctx.log.debug(`respawn ${p.name} em ${pos.x.toFixed(0)},${pos.z.toFixed(0)} (inimigo + próximo ${pos.nearest.toFixed(0)}m)`);

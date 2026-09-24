@@ -108,9 +108,17 @@ export class Match {
     if (!msg || typeof msg.t !== 'string') return;
     switch (msg.t) {
       case C2S.READY: p.ready = !!msg.ready; break;
-      case C2S.INPUT:
-        if (Number.isFinite(msg.seq)) { if (msg.seq <= p.lastSeq) return; p.lastSeq = msg.seq; }
-        p.input = MovementSystem.sanitize(msg, p.input); p.input.interactPlateChain = msg.plateChain === true; break;
+      case C2S.INPUT: {
+        // seq precisa crescer; inputs vão para a fila e são consumidos pelo MovementSystem
+        if (Number.isFinite(msg.seq)) { if (msg.seq <= (p.lastQueuedSeq ?? 0)) return; p.lastQueuedSeq = msg.seq; }
+        const inp = MovementSystem.sanitize(msg, p.input);
+        inp.seq = Number.isFinite(msg.seq) ? msg.seq : 0;
+        inp.dt = Math.min(1 / 15, Math.max(0.001, Number(msg.dt) || 1 / 30));
+        inp.interactPlateChain = msg.plateChain === true;
+        (p.inputQueue ??= []).push(inp);
+        if (p.inputQueue.length > 30) p.inputQueue.shift();
+        break;
+      }
       case C2S.FIRE: S.weapons.requestFire(p, msg); break;
       case C2S.THROW: S.weapons.requestThrow(p, msg); break;
       case C2S.RELOAD: S.inventory.requestReload(p); break;

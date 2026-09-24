@@ -56,10 +56,11 @@ test('servidor limita velocidade (sem teleporte/speed hack)', () => {
 
 test('input com seq antigo é descartado', () => {
   const m = createMatch();
-  const [a] = startAndLand(m, ['A', 'B']);
+  const [a] = startAndLand(m, ['A', 'B', 'C', 'D']);
   m.handle(a, { t: 'input', seq: 10, mz: -1 });
   m.handle(a, { t: 'input', seq: 5, mz: 1 });
-  assert.equal(a.input.mz, -1);
+  assert.equal(a.inputQueue.length, 1);
+  m.tick(DT); assert.equal(a.input.mz, -1); assert.equal(a.lastSeq, 10);
 });
 
 // ===================== Loot =====================

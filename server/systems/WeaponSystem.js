@@ -95,7 +95,7 @@ export class WeaponSystem {
       const h = this.trace(pr.owner, pr.o, d, step);
       if (h) { h.t += pr.traveled; this.hit(pr.owner, h, pr.weapon); }
       pr.o.x += pr.v.x * dt; pr.o.y += pr.v.y * dt; pr.o.z += pr.v.z * dt; pr.v.y -= g * dt; pr.traveled += step;
-      if (h || pr.traveled > def.range || pr.o.y < this.ctx.map.groundHeight(pr.o.x, pr.o.z)) { this.projectiles.splice(i, 1); this.pool.release(pr); }
+      if (h || pr.traveled > def.range || pr.o.y < this.ctx.map.groundHeight(pr.o.x, pr.o.z, pr.o.y)) { this.projectiles.splice(i, 1); this.pool.release(pr); }
     }
   }
 
@@ -112,7 +112,7 @@ export class WeaponSystem {
     for (let i = this.grenades.length - 1; i >= 0; i--) {
       const g = this.grenades[i];
       g.vy -= G * dt; g.x += g.vx * dt; g.y += g.vy * dt; g.z += g.vz * dt;
-      const ground = this.ctx.map.groundHeight(g.x, g.z);
+      const ground = this.ctx.map.groundHeight(g.x, g.z, g.y);
       if (g.y < ground + 0.1) { g.y = ground + 0.1; g.vy *= -0.35; g.vx *= 0.6; g.vz *= 0.6; }
       g.fuse -= dt;
       if (g.fuse <= 0) {
