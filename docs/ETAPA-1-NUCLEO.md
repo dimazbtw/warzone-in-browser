@@ -64,7 +64,7 @@ Jogador: lobby → aircraft → freefall → parachute → alive ⇄ downed
 - **Estado atual:** andar, sprint, sprint tático com stamina, agachar, prone, pulo, queda livre, paraquedas (manual ou automático) e rastejar abatido.
 - **Anti-cheat:** `sanitize()` normaliza o vetor de movimento e força booleanos. Inputs com `seq` antigo são descartados. Como o servidor integra a física, speed hack e teleporte são impossíveis.
 - **Configuração:** `movement.*` (velocidades, gravidade, stamina).
-- **Próxima etapa:** slide, mantle/vault e escalada usando `MapData.boxes`, além de predição e reconciliação no cliente.
+- **Atualizado na Etapa 2:** slide, mantle/vault, escalada e fila de inputs com física compartilhada (veja ETAPAS-2-5.md).
 
 ### 5. InventorySystem + ArmorSystem
 - Slots primária e secundária, munição por tipo, placas, curas, letais e dinheiro (mantido entre vidas).
