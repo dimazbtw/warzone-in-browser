@@ -9,41 +9,58 @@
 <body>
 <div id="menu">
   <div class="menu-bg"></div>
-  <div class="menu-content">
+  <div class="menu-content" id="mainPanel">
     <h1>RESURGENCE<span>ZONE</span></h1>
     <p class="sub">Battle Royale • Ressurgimento • 20 Operadores</p>
     <button id="playBtn">JOGAR</button>
     <div class="controls">
       <b>WASD</b> mover • <b>Mouse</b> mirar • <b>Clique</b> atirar • <b>Botão direito</b> ADS<br>
       <b>Shift</b> correr • <b>Espaço</b> pular • <b>C</b> agachar • <b>R</b> recarregar • <b>1/2</b> trocar arma<br>
-      <b>E</b> abrir baú / pegar • <b>Q</b> placa de armadura • <b>M</b> mapa
+      <b>E</b> abrir baú / pegar • <b>Q</b> placa de armadura • <b>G</b> granada • <b>B</b> comprar Loadout Drop ($5000) • <b>M</b> mapa
     </div>
     <p class="rules">Morreu? Você volta de paraquedas enquanto o <b>ressurgimento</b> estiver ativo.
-    Quando o timer de resurgência desliga (círculo final), a morte é definitiva.</p>
+    Quando o ressurgimento desliga (fase 4 do gás), a morte é definitiva.</p>
+  </div>
+
+  <div id="loadout" class="hidden">
+    <div class="lo-head"><h2>LOADOUT</h2><span>Escolha seu operador e equipamento</span></div>
+    <div class="lo-section"><h3>OPERADOR</h3><div class="lo-row" id="loOperators"></div></div>
+    <div class="lo-grid">
+      <div class="lo-section"><h3>ARMA PRIMÁRIA</h3><div class="lo-list" id="loPrimary"></div></div>
+      <div class="lo-section"><h3>ARMA SECUNDÁRIA</h3><div class="lo-list" id="loSecondary"></div></div>
+      <div class="lo-section"><h3>CAMUFLAGEM</h3><div class="lo-list" id="loCamo"></div></div>
+      <div class="lo-section"><h3>VANTAGEM</h3><div class="lo-list" id="loPerk"></div></div>
+      <div class="lo-section"><h3>LETAL</h3><div class="lo-list" id="loLethal"></div></div>
+    </div>
+    <div class="lo-foot"><canvas id="loPreview" width="420" height="140"></canvas><div id="loStats"></div><button id="deployBtn">IMPLANTAR</button></div>
   </div>
 </div>
 
 <div id="hud" class="hidden">
   <div id="crosshair"><i></i><i></i><i></i><i></i></div>
   <div id="hitmarker"></div>
-  <div id="topbar">
-    <div id="alive">VIVOS <b>20</b></div>
-    <div id="kills">ABATES <b>0</b></div>
-    <div id="circle">GÁS <b>--</b></div>
-    <div id="resp">RESSURGIMENTO <b>--</b></div>
-  </div>
-  <canvas id="minimap" width="200" height="200"></canvas>
+  <div id="scope" class="hidden"></div>
+
+  <div id="compass"><div id="compassStrip"></div><i class="needle"></i></div>
+
+  <div id="mmWrap"><canvas id="minimap" width="220" height="220"></canvas><span class="north">N</span></div>
+  <div id="gasinfo"><div id="circle">⚠ <b>--</b></div><div id="resp">RESSURGIMENTO <b>--</b></div></div>
+
+  <div id="topright"><span id="alive">👤 <b>20</b></span><span id="kills">☠ <b>0</b></span></div>
   <div id="killfeed"></div>
-  <div id="vitals">
-    <div id="plates"><i></i><i></i><i></i></div>
-    <div id="hpbar"><div></div></div>
-    <div id="platecount">Placas: <b>2</b></div>
+
+  <div id="squad">
+    <div class="sq-row me"><span class="tag">[RZ]</span> <span id="sqName">Você</span><span id="cash">$ <b>0</b></span>
+      <div id="vitals"><div id="plates"><i></i><i></i><i></i></div><div id="hpbar"><div></div></div></div>
+    </div>
   </div>
+
   <div id="weapon">
+    <div id="equip"><span id="lethal">💣 <b>2</b></span><span id="platecount">🛡 <b>2</b></span></div>
+    <div class="wrow"><canvas id="wicon" width="140" height="44"></canvas><div id="ammo"><b>30</b><small>90</small></div></div>
     <div id="wname">M4</div>
-    <div id="ammo"><b>30</b> / 90</div>
-    <div id="cash">$ <b>0</b></div>
   </div>
+
   <div id="prompt"></div>
   <div id="center-msg"></div>
   <div id="gasOverlay"></div>
@@ -58,7 +75,10 @@
 </div>
 
 <script type="importmap">
-{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+} }
 </script>
 <script type="module" src="game.js"></script>
 </body>
