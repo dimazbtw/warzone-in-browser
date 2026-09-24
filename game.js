@@ -4,6 +4,8 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
 // ================== CONFIG ==================
 const MAP = 420;                 // tamanho do mapa
@@ -62,6 +64,8 @@ sun.castShadow = true;
 sun.shadow.mapSize.set(2048, 2048);
 Object.assign(sun.shadow.camera, { left: -120, right: 120, top: 120, bottom: -120, far: 500 });
 scene.add(sun, sun.target);
+
+const ASSETS = {}; // modelos 3D do Higgsfield carregados em runtime
 
 // ================== RNG ==================
 let seed = 1337;
@@ -463,7 +467,7 @@ function buildGunModel(id, camo, small = false) {
 let armsGroup = null;
 function buildGun(id) {
   gunGroup.clear();
-  const model = buildGunModel(id, loadout.camo);
+  const model = id === 'm4' && ASSETS.rifle ? ASSETS.rifle.clone() : buildGunModel(id, loadout.camo);
   gunGroup.add(model);
   armsGroup = buildArms(OPERATORS[loadout.op]);
   // posicionar mão esquerda de acordo com o tamanho da arma
@@ -557,6 +561,7 @@ function setBotGun(b) {
   const old = b.mesh.userData.gunSlot; b.mesh.remove(old);
   const gun = buildGunModel(b.weapon, ['black', 'desert', 'forest', 'urban'][b.i % 4]); gun.scale.setScalar(1.1); gun.position.copy(old.position);
   gun.traverse(o => { o.userData.bot = b.i; o.castShadow = true; });
+  if (ASSETS.soldier) gun.traverse(o => { if (o.isMesh) o.material = new THREE.MeshBasicMaterial({ visible: false }); });
   b.mesh.add(gun); b.mesh.userData.gunSlot = gun;
 }
 const allMeshes = () => bots.filter(b => b.alive).map(b => b.mesh);
@@ -914,6 +919,7 @@ function updateBots(dt) {
     if (prev.distanceTo(b.pos) < speed * dt * 0.3) { b.strafe *= -1; b.dest.set(b.pos.x + rr(-20, 20), b.pos.z + rr(-20, 20)); }
     b.mesh.position.copy(b.pos);
     b.mesh.rotation.y = b.yaw;
+    if (b.mixer) { b.action.timeScale = Math.min(1.4, (prev.distanceTo(b.pos) / dt) / 5); b.mixer.update(dt); }
     const moved = prev.distanceTo(b.pos) / dt; b.walk += moved * dt * 2.2;
     const [lL, lR] = b.mesh.userData.legs; lL.rotation.x = Math.sin(b.walk) * 0.5 * Math.min(1, moved / 3); lR.rotation.x = -lL.rotation.x;
     if (inGas(b.pos.x, b.pos.z)) { b.hp -= gas.dmg * dt; if (b.hp <= 0) kill(b, null); }
@@ -1083,7 +1089,7 @@ function buyLoadout() {
   const fwd = new THREE.Vector3(-Math.sin(player.yaw), 0, -Math.cos(player.yaw));
   drop.x = player.pos.x + fwd.x * 5; drop.z = player.pos.z + fwd.z * 5; drop.y = 60;
   const g = new THREE.Group();
-  const box = part(B(1.6, 1.0, 1.1), new THREE.MeshStandardMaterial({ color: 0x3d4a2a, roughness: 0.8 }), 0, 0.5, 0); box.castShadow = true;
+  const box = part(B(1.6, 1.0, 1.1), crateMat, 0, 0.5, 0); box.castShadow = true;
   const band = part(B(1.65, 0.12, 1.15), new THREE.MeshStandardMaterial({ color: 0x7cff6b, emissive: 0x2f8a20 }), 0, 0.8, 0);
   const chute = new THREE.Mesh(new THREE.SphereGeometry(2, 10, 5, 0, Math.PI * 2, 0, Math.PI / 3), canopyMat); chute.position.y = 4; chute.scale.y = 0.5;
   g.add(box, band, chute); g.userData.chute = chute; g.position.set(drop.x, drop.y, drop.z); scene.add(g);
@@ -1264,4 +1270,93 @@ function loop() {
   composer.render();
 }
 loop();
+// ================== ASSETS HIGGSFIELD (texturas + modelos 3D) ==================
+// Tudo gerado no Higgsfield. Se o CDN falhar (rede/CORS), o jogo mantém os assets procedurais.
+const HF = 'https://d8j0ntlcm91z4.cloudfront.net/user_3Jib0BzU3aLdeWOQjrliCwaWdFv/hf_20260924_';
+const HF_TEX = {
+  ground:    HF + '173816_8da157e1-0e79-4b7a-8cef-33698d7841d9.png',
+  asphalt:   HF + '173816_c2c60d5c-d277-4b85-af29-bed00844e3e9.png',
+  facade:    HF + '173816_0883ab29-9c27-45e9-a103-08ead8b79f18.png',
+  brick:     HF + '173847_5a2f95cf-3c03-43c1-8740-f830b13a0ab2.png',
+  container: HF + '173816_d261a97d-8a6c-4b1a-988c-d49be2eafbf3.png',
+  crate:     HF + '173816_7ec2053c-2b82-4c8b-8152-cc75bf44c1d0.png',
+  roof:      HF + '173816_0bfc50ac-de26-4d9c-8c15-23e3c60f12f8.png',
+  foliage:   HF + '173817_b662c4f6-0d95-4fac-b44a-d293fcc486f2.png',
+};
+const HF_MODELS = { soldier: '__SOLDIER__', rifle: '__RIFLE__' };
+
+const crateMat = new THREE.MeshStandardMaterial({ color: 0x3d4a2a, roughness: 0.8 });
+const texLoader = new THREE.TextureLoader(); texLoader.setCrossOrigin('anonymous');
+function hfTex(key, repX, repY, apply) {
+  if (!HF_TEX[key] || HF_TEX[key].startsWith('__')) return;
+  texLoader.load(HF_TEX[key], t => {
+    t.colorSpace = THREE.SRGBColorSpace; t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(repX, repY);
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    apply(t);
+  }, undefined, () => console.warn('Textura Higgsfield indisponível:', key));
+}
+const setMap = (mats, color) => t => { for (const m of mats) { m.map = t; if (color !== undefined) m.color.set(color); m.needsUpdate = true; } };
+hfTex('ground', 70, 70, setMap([ground.material], 0xffffff));
+hfTex('asphalt', 1, 20, setMap([roadMat], 0xbbbbbb));
+hfTex('roof', 2, 2, setMap([roofMat], 0xffffff));
+hfTex('foliage', 2, 2, setMap([leafMat], 0xcfd8b0));
+hfTex('container', 2, 1, t => contMats.forEach(m => { m.map = t; m.metalness = 0.2; m.needsUpdate = true; }));
+hfTex('crate', 1, 1, t => { crateMat.map = t; crateMat.color.set(0xffffff); crateMat.needsUpdate = true;
+  for (const c of chests) { const box = c.mesh.children[0]; box.material = crateMat; } });
+// fachadas: metade concreto, metade tijolo, com leve variação de tom
+const tints = [0xffffff, 0xe8e0d0, 0xd8d8e0, 0xf0e4d4, 0xdcd4c4, 0xffffff];
+hfTex('facade', 1, 1, t => bMats.forEach((m, i) => { if (i % 2 === 0 || HF_TEX.brick.startsWith('__')) { m.map = t; m.color.set(tints[i]); m.needsUpdate = true; } }));
+hfTex('brick', 1, 1, t => bMats.forEach((m, i) => { if (i % 2 === 1) { m.map = t; m.color.set(tints[i]); m.needsUpdate = true; } }));
+
+const gltf = new GLTFLoader(); gltf.setCrossOrigin('anonymous');
+function normalizeModel(root, size, axis = 'y') {
+  const box = new THREE.Box3().setFromObject(root), s = box.getSize(new THREE.Vector3());
+  root.scale.multiplyScalar(size / s[axis]);
+  return root;
+}
+// soldado rigado + animação de corrida (Meshy via Higgsfield)
+if (!HF_MODELS.soldier.startsWith('__')) gltf.load(HF_MODELS.soldier, g => {
+  const src = g.scene; normalizeModel(src, 1.85);
+  const b0 = new THREE.Box3().setFromObject(src); src.position.y -= b0.min.y;
+  src.traverse(o => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+  const hidden = new THREE.MeshBasicMaterial({ visible: false });
+  for (const b of bots) {
+    // mantém caixas procedurais como hitbox invisível; troca o visual pelo modelo 3D
+    b.mesh.traverse(o => { if (o.isMesh && !isChute(b, o)) o.material = hidden; });
+    const vis = SkeletonUtils.clone(src); vis.rotation.y = Math.PI;
+    vis.traverse(o => { o.userData.bot = b.i; });
+    const wrap = new THREE.Group(); wrap.add(vis); b.mesh.add(wrap);
+    if (g.animations.length) { b.mixer = new THREE.AnimationMixer(vis); b.action = b.mixer.clipAction(g.animations[0]); b.action.play(); b.mixer.update(Math.random()); }
+  }
+  ASSETS.soldier = true;
+}, undefined, () => console.warn('Modelo de soldado Higgsfield indisponível'));
+function isChute(b, o) { let p = o; while (p) { if (p === b.mesh.userData.chute) return true; p = p.parent; } return false; }
+
+// fuzil 3D para a M4 em primeira pessoa
+if (!HF_MODELS.rifle.startsWith('__')) gltf.load(HF_MODELS.rifle, g => {
+  const raw = g.scene;
+  const box = new THREE.Box3().setFromObject(raw), size = box.getSize(new THREE.Vector3());
+  const long = size.x >= size.z ? 'x' : 'z';
+  // detectar a ponta do cano: extremidade com menor altura (lado fino)
+  const ends = [0, 0], cnt = [0, 0], v = new THREE.Vector3();
+  raw.updateMatrixWorld(true);
+  raw.traverse(o => { if (!o.isMesh) return; const p = o.geometry.attributes.position;
+    for (let i = 0; i < p.count; i += 3) { v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld);
+      const k = (v[long] - box.min[long]) / size[long]; if (k < 0.2) { ends[0] += v.y; cnt[0]++; } else if (k > 0.8) { ends[1] += v.y; cnt[1]++; } } });
+  const spread = side => { let lo = Infinity, hi = -Infinity; raw.traverse(o => { if (!o.isMesh) return; const p = o.geometry.attributes.position;
+    for (let i = 0; i < p.count; i += 3) { v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld); const k = (v[long] - box.min[long]) / size[long];
+      if (side ? k > 0.85 : k < 0.15) { lo = Math.min(lo, v.y); hi = Math.max(hi, v.y); } } }); return hi - lo; };
+  const muzzlePositive = spread(1) < spread(0);
+  const center = box.getCenter(new THREE.Vector3()); raw.position.sub(center);
+  const pivot = new THREE.Group(); pivot.add(raw);
+  // alinhar o cano com -Z (frente da câmera)
+  if (long === 'x') pivot.rotation.y = muzzlePositive ? Math.PI / 2 : -Math.PI / 2;
+  else pivot.rotation.y = muzzlePositive ? Math.PI : 0;
+  const L = 0.72; pivot.scale.setScalar(L / size[long]);
+  const holder = new THREE.Group(); pivot.position.set(0, 0.0, -L * 0.42); holder.add(pivot);
+  holder.userData.muzzleZ = -L * 0.92; holder.userData.L = L;
+  ASSETS.rifle = holder;
+  if (started && curW().id === 'm4') buildGun('m4');
+}, undefined, () => console.warn('Modelo de fuzil Higgsfield indisponível'));
+
 window.RZ = { player, bots, loadout }; // depuração via console
