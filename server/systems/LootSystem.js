@@ -92,7 +92,7 @@ export class LootSystem {
     if (!it) return fail('gone');                          // alguém pegou antes
     if (Math.hypot(it.x - p.pos.x, it.z - p.pos.z) > this.ctx.cfg.loot.pickupRange) return fail('range');
     if (!this.apply(p, it)) return fail('full');
-    this.ctx.bus.emit('pickup', { playerId: p.id, type: it.type, data: it.data });
+    this.ctx.bus.emit('pickup', { playerId: p.id, kind: it.type, data: it.data });
     this.remove(it);
   }
 
@@ -104,7 +104,7 @@ export class LootSystem {
       near.length = 0; this.grid.query(p.pos.x, p.pos.z, a.radius, near);
       for (const it of near) {
         if (!a.types.includes(it.type) || Math.hypot(it.x - p.pos.x, it.z - p.pos.z) > a.radius) continue;
-        if (this.apply(p, it)) { this.ctx.bus.emit('pickup', { playerId: p.id, type: it.type, data: it.data, auto: true }); this.remove(it); }
+        if (this.apply(p, it)) { this.ctx.bus.emit('pickup', { playerId: p.id, kind: it.type, data: it.data, auto: true }); this.remove(it); }
       }
     }
   }

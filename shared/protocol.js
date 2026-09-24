@@ -17,7 +17,10 @@ export const C2S = {
   SPECTATE: 'spectate',   // { dir: 1|-1 }
   CONTRACT: 'contract',   // { boardId }
   BUY: 'buy',             // { stationId, item, targetId? }
-  PING: 'ping',           // { t }
+  MELEE: 'melee',         // { yaw }
+  TACTICAL: 'tactical',   // { yaw, pitch }  granada de fumaça
+  MARK: 'mark',           // { x, y, z, kind }  ping para o squad
+  PING: 'ping',           // { t0 }
 };
 
 export const S2C = {
@@ -36,4 +39,5 @@ export const GAME_EVENTS = [
   'zonePhase', 'zoneClosing', 'lootSpawned', 'lootRemoved', 'squadEliminated', 'matchEnded', 'jumped', 'killfeed',
   'explosion', 'announce', 'contractBoard', 'contractStarted', 'contractUpdate', 'contractCompleted', 'contractFailed',
   'purchase', 'purchaseFailed', 'pickup', 'pickupFailed', 'plateBroken', 'reviveStarted', 'slid', 'mantled', 'vaulted', 'landed', 'shot', 'respawnTimer',
+  'chestOpened', 'chestFailed', 'melee', 'meleeHit', 'smoke', 'ping', 'footstep', 'reconnected',
 ];

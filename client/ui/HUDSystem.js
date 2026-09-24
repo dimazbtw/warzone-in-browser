@@ -22,6 +22,7 @@ export class HUDSystem {
   killfeed(text, me) { this.feed.unshift({ text, me, at: performance.now() }); this.feed.length = Math.min(this.feed.length, 6); }
   hitmarker(head, kill) { const h = $('hitmarker'); h.style.setProperty('--c', kill ? '#ff3b3b' : head ? '#ffd24d' : '#fff'); h.style.opacity = 1; this.hitT = performance.now() + (kill ? 300 : 120); }
   damageFrom(angle) { this.dirs.push({ angle, until: performance.now() + 700 }); }
+  xp(text) { const el = document.getElementById('xpPop'), d = document.createElement('div'); d.textContent = text; el.appendChild(d); setTimeout(() => d.remove(), 1600); }
   shotPing(x, z) { this.shots.push({ x, z, until: performance.now() + 1500 }); }
 
   buildCompass() {

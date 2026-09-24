@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import { EventBus } from './core/EventBus.js';
 import { Logger } from './core/Logger.js';
 import { makeRng } from './core/math.js';
@@ -22,6 +21,9 @@ import { SpectatorSystem } from './systems/SpectatorSystem.js';
 import { BotSystem } from './systems/BotSystem.js';
 import { ContractSystem } from './systems/ContractSystem.js';
 import { BuyStationSystem } from './systems/BuyStationSystem.js';
+
+/** UUID que funciona no Node e no navegador (Web Worker). */
+const uuid = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
 
 const BOT_NAMES = ['Aurora', 'Bento', 'Caju', 'Dara', 'Elo', 'Fumaça', 'Guará', 'Hélio', 'Iara', 'Jambo', 'Kiko', 'Lume', 'Maré', 'Nado', 'Onça', 'Pipa', 'Quartzo', 'Raio', 'Sabiá', 'Tupã', 'Urso', 'Vento', 'Xamã', 'Zepa'];
 
@@ -69,7 +71,7 @@ export class Match {
 
   // ---------------- lobby / conexão ----------------
   /** Entra ou reconecta. Retorna { player, reconnected } ou { error }. */
-  join({ name, token, party, isBot = false }) {
+  join({ name, token, party, isBot = false, operator }) {
     const { ctx } = this;
     if (token && this.tokens.has(token)) {
       const p = ctx.players.get(this.tokens.get(token));
@@ -78,10 +80,11 @@ export class Match {
     if (this.state !== MS.LOBBY && this.state !== MS.COUNTDOWN) return { error: 'partida em andamento' };
     if (ctx.players.size >= ctx.cfg.match.maxPlayers) return { error: 'lobby cheio' };
     const p = new Player({
-      id: `P${this.nextId++}`, name: String(name || 'Jogador').replace(/[<>&"]/g, '').slice(0, 16) || 'Jogador', token: randomUUID(), isBot,
+      id: `P${this.nextId++}`, name: String(name || 'Jogador').replace(/[<>&"]/g, '').slice(0, 16) || 'Jogador', token: uuid(), isBot,
       onStateChange: (pl, from, to, info) => { ctx.log.debug(`${pl.name}: ${from} → ${to}`, info); ctx.bus.emit('playerState', { playerId: pl.id, from, to, info }); },
     });
     p.party = party ? String(party).slice(0, 12).toUpperCase() : null;
+    p.operator = Number.isInteger(operator) && operator >= 0 && operator < 16 ? operator : null;
     ctx.players.set(p.id, p); this.tokens.set(p.token, p.id);
     ctx.log.info(`${p.name}${isBot ? ' (bot)' : ''} entrou (${ctx.players.size})`);
     ctx.bus.emit('lobbyChanged', {});

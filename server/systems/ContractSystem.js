@@ -137,8 +137,8 @@ export class ContractSystem {
       if (attacker?.squadId === c.squadId) this.complete(c); else this.fail(c, 'alvo eliminado por outro');
     }
   }
-  onPickup({ playerId, type, data }) {
-    if (type !== 'intel') return;
+  onPickup({ kind, data }) {
+    if (kind !== 'intel') return;
     const c = [...this.active.values()].find(k => k.id === data.contractId); if (!c) return;
     c.progress++; if (c.progress >= c.goal) this.complete(c); else this.update(c);
   }

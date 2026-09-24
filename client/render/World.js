@@ -185,7 +185,7 @@ export class World {
   buildPost() {
     const c = this.composer = new EffectComposer(this.renderer);
     c.addPass(new RenderPass(this.scene, this.camera));
-    c.addPass(new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.4, 0.6, 0.85));
+    c.addPass(this.bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.4, 0.6, 0.85));
     c.addPass(new OutputPass());
     this.grade = new ShaderPass({
       uniforms: { tDiffuse: { value: null }, time: { value: 0 }, damage: { value: 0 }, gas: { value: 0 }, ads: { value: 0 }, downed: { value: 0 }, res: { value: new THREE.Vector2(innerWidth, innerHeight) } },
@@ -203,5 +203,18 @@ export class World {
     });
     c.addPass(this.grade);
   }
+  /** Aplica preset de qualidade (Settings.QUALITY). */
+  applyQuality(q) {
+    this.quality = q;
+    this.renderer.setPixelRatio(Math.min(devicePixelRatio, q.pixelRatio));
+    this.renderer.shadowMap.enabled = q.shadows; this.sun.castShadow = q.shadows;
+    if (this.sun.shadow.mapSize.x !== q.shadowMap) { this.sun.shadow.mapSize.set(q.shadowMap, q.shadowMap); this.sun.shadow.map?.dispose(); this.sun.shadow.map = null; }
+    if (this.bloom) this.bloom.enabled = q.bloom;
+    if (this.grade) this.grade.enabled = q.post;
+    this.scene.fog.far = q.viewDistance; this.camera.far = q.viewDistance + 800; this.camera.updateProjectionMatrix();
+    this.renderer.setSize(innerWidth, innerHeight); this.composer.setSize(innerWidth, innerHeight);
+    this.scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
+  }
+  clearMatch() { this.dynamic.clear(); this.loot.clear(); }
   render() { this.composer.render(); }
 }

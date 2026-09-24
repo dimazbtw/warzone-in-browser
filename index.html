@@ -4,43 +4,102 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Zona Ressurge</title>
+<meta name="description" content="Battle royale com ressurgimento, direto no navegador.">
 <link rel="stylesheet" href="client/style.css">
 </head>
 <body>
 <canvas id="gl"></canvas>
 
-<!-- ============ MENU / LOBBY ============ -->
+<!-- ======================= MENU ======================= -->
 <div id="menu" class="screen">
   <div class="menu-bg"></div>
-  <div class="menu-panel">
-    <h1>ZONA<span>RESSURGE</span></h1>
-    <p class="sub">Battle Royale • Ressurgimento • Multiplayer</p>
-    <form id="joinForm">
-      <input id="name" placeholder="Seu nome" maxlength="16" required autocomplete="off">
-      <input id="party" placeholder="Código de party (opcional)" maxlength="12" autocomplete="off">
-      <button>ENTRAR NO LOBBY</button>
-    </form>
-    <div id="lobbyBox" class="hidden">
-      <div id="lobbyHead"></div>
-      <div id="lobbyList"></div>
-      <p class="muted">Clique na tela para capturar o mouse quando a partida começar.</p>
+  <header class="topbar">
+    <div class="brand">ZONA <b>RESSURGE</b></div>
+    <nav>
+      <button data-go="home" class="nav on">INÍCIO</button>
+      <button data-go="operator" class="nav">OPERADOR</button>
+      <button data-go="career" class="nav">CARREIRA</button>
+      <button data-go="settings" class="nav">CONFIGURAÇÕES</button>
+      <button data-go="controls" class="nav">CONTROLES</button>
+    </nav>
+    <div id="playerCard" class="player-card"></div>
+  </header>
+
+  <section class="panel-screen" data-screen="home">
+    <div class="hero">
+      <h1>ZONA<span>RESSURGE</span></h1>
+      <p class="sub">Battle royale com ressurgimento · até 60 operadores · direto no navegador</p>
+      <div class="hero-actions">
+        <button class="cta" data-go="play">JOGAR</button>
+        <button class="ghost" data-go="online">MULTIPLAYER ONLINE</button>
+      </div>
+      <ul class="bullets">
+        <li><b>Ressurgimento:</b> morreu com um aliado vivo? Você volta de paraquedas.</li>
+        <li><b>Contratos</b>, <b>estações de compra</b> e <b>baús</b> por todo o mapa.</li>
+        <li>Slide, mantle, escalada, prédios com interior e bots que lutam entre si.</li>
+      </ul>
     </div>
-    <details class="settings"><summary>Configurações</summary>
-      <label>Sensibilidade <input id="sens" type="range" min="0.0008" max="0.005" step="0.0001"></label>
-      <label>Volume <input id="vol" type="range" min="0" max="1" step="0.05"></label>
-    </details>
-    <div class="controls">
-      <b>WASD</b> mover • <b>Shift</b> correr (2× = tático) • <b>C</b> agachar/slide • <b>Z</b> prone • <b>Espaço</b> pular/mantle/escalar/paraquedas<br>
-      <b>Clique</b> atirar • <b>Botão dir.</b> mirar • <b>R</b> recarregar • <b>1/2</b> armas • <b>Q</b> placa • <b>H</b> cura • <b>G</b> granada<br>
-      <b>E</b> pegar / segurar para reviver • <b>F</b> contrato • <b>B</b> estação • <b>M</b> mapa • <b>Tab</b> placar • <b>[ ]</b> espectador
+  </section>
+
+  <section class="panel-screen hidden" data-screen="play">
+    <h2>NOVA PARTIDA <small>contra bots · roda no seu navegador</small></h2>
+    <div class="group"><h3>MODO</h3><div class="tiles" id="modeTiles"></div></div>
+    <div class="row2">
+      <div class="group"><h3>DIFICULDADE DOS BOTS</h3><div class="seg" id="diffSeg"></div></div>
+      <div class="group"><h3>JOGADORES NA PARTIDA</h3><div class="seg" id="playersSeg"></div></div>
     </div>
-    <p class="muted"><a href="client-debug/">cliente de debug 2D</a> · <a href="offline/">protótipo offline</a></p>
+    <div class="actions"><button class="ghost" data-go="home">VOLTAR</button><button class="cta" id="startOffline">INICIAR PARTIDA</button></div>
+  </section>
+
+  <section class="panel-screen hidden" data-screen="online">
+    <h2>MULTIPLAYER ONLINE <small>requer o servidor (npm start)</small></h2>
+    <div class="group narrow">
+      <label>Código de party (mesmo código = mesmo squad)<input id="partyCode" maxlength="12" placeholder="ex.: TIGRES" autocomplete="off"></label>
+      <div class="actions left"><button class="cta" id="connectOnline">CONECTAR</button><button class="ghost" data-go="home">VOLTAR</button></div>
+      <p id="onlineStatus" class="muted"></p>
+    </div>
+    <div id="lobbyBox" class="group hidden"><div id="lobbyHead"></div><div id="lobbyList"></div></div>
+  </section>
+
+  <section class="panel-screen hidden" data-screen="operator">
+    <h2>OPERADOR</h2>
+    <div class="group narrow"><label>Nome em jogo<input id="playerName" maxlength="16" placeholder="Seu nome" autocomplete="off"></label></div>
+    <div class="op-grid" id="opGrid"></div>
+  </section>
+
+  <section class="panel-screen hidden" data-screen="career">
+    <h2>CARREIRA</h2>
+    <div id="careerBox"></div>
+  </section>
+
+  <section class="panel-screen hidden" data-screen="settings">
+    <h2>CONFIGURAÇÕES</h2>
+    <div id="settingsBox" class="settings-grid"></div>
+  </section>
+
+  <section class="panel-screen hidden" data-screen="controls">
+    <h2>CONTROLES</h2>
+    <div id="controlsBox" class="controls-grid"></div>
+  </section>
+
+  <footer class="credits">Arte gerada com Higgsfield · Three.js · Código, nomes, mapa e sons originais</footer>
+</div>
+
+<!-- ======================= CARREGANDO ======================= -->
+<div id="loading" class="screen hidden">
+  <div class="load-box">
+    <div class="brand big">ZONA <b>RESSURGE</b></div>
+    <div id="loadStage">Preparando partida…</div>
+    <div class="load-bar"><i id="loadBar"></i></div>
+    <div id="loadTip" class="muted"></div>
   </div>
 </div>
 
-<!-- ============ HUD ============ -->
+<!-- ======================= HUD ======================= -->
 <div id="hud" class="hidden">
-  <div id="crosshair"><i></i><i></i><i></i><i></i></div>
+  <div id="worldMarkers"></div>
+  <div id="dmgNumbers"></div>
+  <div id="crosshair"><i></i><i></i><i></i><i></i><b></b></div>
   <div id="hitmarker"></div>
   <div id="dmgDirs"></div>
   <div id="scope" class="hidden"></div>
@@ -56,14 +115,38 @@
   <div id="prompt"></div>
   <div id="center"></div>
   <div id="toast"></div>
+  <div id="xpPop"></div>
   <div id="respawn" class="hidden"></div>
   <div id="shop" class="hidden"></div>
-  <canvas id="bigmap" width="640" height="640" class="hidden"></canvas>
+  <div id="inventory" class="hidden"></div>
+  <canvas id="bigmap" width="720" height="720" class="hidden"></canvas>
   <div id="scoreboard" class="hidden"></div>
+  <div id="fps" class="hidden"></div>
   <div id="netStatus"></div>
 </div>
 
-<div id="end" class="screen hidden"><h1 id="endTitle"></h1><div id="endStats"></div><p class="muted">Novo lobby em instantes…</p></div>
+<!-- ======================= PAUSA ======================= -->
+<div id="pause" class="screen hidden">
+  <div class="pause-box">
+    <h2 id="pauseTitle">PAUSADO</h2>
+    <p id="pauseSub" class="muted"></p>
+    <button class="cta" id="resumeBtn">CONTINUAR</button>
+    <button class="ghost" id="pauseSettings">CONFIGURAÇÕES</button>
+    <button class="ghost" id="pauseControls">CONTROLES</button>
+    <button class="ghost danger" id="leaveBtn">SAIR DA PARTIDA</button>
+    <div id="pausePanel" class="hidden"></div>
+  </div>
+</div>
+
+<!-- ======================= FIM ======================= -->
+<div id="end" class="screen hidden">
+  <div class="end-box">
+    <h1 id="endTitle"></h1>
+    <div id="endStats"></div>
+    <div id="endXp"></div>
+    <div class="actions"><button class="ghost" id="endMenu">MENU</button><button class="cta" id="endAgain">JOGAR NOVAMENTE</button></div>
+  </div>
+</div>
 
 <script type="importmap">
 { "imports": {
