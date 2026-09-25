@@ -41,7 +41,7 @@ export class LootRenderer {
     this.m4 = new THREE.Matrix4(); this.q = new THREE.Quaternion(); this.p = new THREE.Vector3(); this.s = new THREE.Vector3(); this.t = 0;
     const tex = glowTexture();
     this.beam = this.instanced(new THREE.CylinderGeometry(0.035, 0.07, 1.2, 8, 1, true).translate(0, 0.6, 0), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.45, depthWrite: false, blending: THREE.AdditiveBlending }), true);
-    this.glow = this.instanced(new THREE.PlaneGeometry(1.1, 1.1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }), true);
+    this.glow = this.instanced(new THREE.PlaneGeometry(1.1, 1.1).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }), true);   // polygonOffset: sem z-fighting com o piso
   }
   instanced(geo, mat, colored = false) {
     const m = new THREE.InstancedMesh(geo, mat, MAX); m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
@@ -83,6 +83,11 @@ export class LootRenderer {
     return { geo, mats };
   }
 
+  /** Cria de antemão os modelos de todos os tipos (compila os shaders no carregamento, não no meio do jogo). */
+  prewarm(weaponIds) {
+    for (const id of weaponIds) this.kind(`w:${id}`, { type: 'weapon', data: { id } });
+    for (const t of ['ammo', 'plate', 'cash', 'heal', 'lethal', 'tactical', 'intel']) this.kind(t, { type: t, data: {} });
+  }
   // ---------------------------------------------------------------- itens
   add(it) {
     if (this.items.has(it.id)) return;
@@ -146,7 +151,7 @@ export class LootRenderer {
           p.set(it.x, it.y + k.lay.y + Math.sin(this.t * 2 + e.yaw) * 0.015, it.z); s.set(1, 1, 1);
           k.mesh.setMatrixAt(k.n++, m4.compose(p, q, s));
         }
-        if (ng < MAX) { p.set(it.x, it.y + 0.02, it.z); q.identity(); s.setScalar(it.type === 'weapon' ? 1.3 : 0.9); this.glow.setMatrixAt(ng, m4.compose(p, q, s)); this.glow.setColorAt(ng++, e.color); }
+        if (ng < MAX) { p.set(it.x, it.y + 0.045, it.z); q.identity(); s.setScalar(it.type === 'weapon' ? 1.3 : 0.9); this.glow.setMatrixAt(ng, m4.compose(p, q, s)); this.glow.setColorAt(ng++, e.color); }
       }
       if (e.beam && nb < MAX) { p.set(it.x, it.y, it.z); q.identity(); s.set(1, 1, 1); this.beam.setMatrixAt(nb, m4.compose(p, q, s)); this.beam.setColorAt(nb++, e.color); }
     }

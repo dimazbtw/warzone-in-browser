@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { settings } from '../core/Settings.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
@@ -202,15 +203,22 @@ export class World {
    * Resolução dinâmica: mede o tempo médio de quadro e ajusta a escala interna
    * (entre 55% e o máximo do preset) para segurar ~60 fps em cenas pesadas.
    */
+  /**
+   * Resolução dinâmica com histerese: só muda depois de 2,5 s estáveis acima/abaixo do alvo,
+   * em degraus de 0,2, e não volta a subir por 12 s depois de descer — mudar a resolução
+   * realoca os buffers de render (travada), então oscilar a cada segundo gerava stutter.
+   */
   render() {
     const now = performance.now(), dt = this.lastFrame ? now - this.lastFrame : 16; this.lastFrame = now;
     if (dt < 250) this.frameAvg = (this.frameAvg ?? 16) * 0.95 + dt * 0.05;
-    if (now - (this.lastScale ?? 0) > 1000 && this.quality) {
+    if (this.quality && settings.get('dynamicRes') !== false) {
+      const slow = this.frameAvg > 24, fast = this.frameAvg < 12;
+      this.slowFor = slow ? (this.slowFor ?? 0) + dt : 0; this.fastFor = fast ? (this.fastFor ?? 0) + dt : 0;
       const max = Math.min(devicePixelRatio, this.quality.pixelRatio), cur = this.renderer.getPixelRatio();
       let next = cur;
-      if (this.frameAvg > 22) next = Math.max(0.55, cur - 0.15); else if (this.frameAvg < 14) next = Math.min(max, cur + 0.1);
-      if (Math.abs(next - cur) > 0.01) { this.renderer.setPixelRatio(next); this.composer.setPixelRatio?.(next); this.composer.setSize(innerWidth, innerHeight); }
-      this.lastScale = now;
+      if (this.slowFor > 2500 && cur > 0.6) { next = Math.max(0.6, cur - 0.2); this.lastDrop = now; }
+      else if (this.fastFor > 2500 && cur < max && now - (this.lastDrop ?? -1e9) > 12000) next = Math.min(max, cur + 0.2);
+      if (Math.abs(next - cur) > 0.01) { this.renderer.setPixelRatio(next); this.composer.setPixelRatio?.(next); this.composer.setSize(innerWidth, innerHeight); this.slowFor = this.fastFor = 0; }
     }
     this.composer.render();
   }

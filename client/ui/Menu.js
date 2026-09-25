@@ -18,6 +18,7 @@ export const SETTINGS_SCHEMA = [
   { key: 'sfxVolume', label: 'Efeitos sonoros', type: 'range', min: 0, max: 1, step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
   { key: 'musicVolume', label: 'Música do menu', type: 'range', min: 0, max: 1, step: 0.05, fmt: v => `${Math.round(v * 100)}%` },
   { key: 'quality', label: 'Qualidade gráfica', type: 'select', options: [['low', 'Baixa'], ['medium', 'Média'], ['high', 'Alta']], hint: 'sombras, grama, distância de visão' },
+  { key: 'dynamicRes', label: 'Resolução dinâmica', type: 'toggle', hint: 'baixa a resolução interna se o FPS cair' },
   { key: 'knifeHold', label: 'Segurar V para equipar a faca', type: 'range', min: 0.3, max: 3, step: 0.1, fmt: v => `${Number(v).toFixed(1)} s`, hint: 'um toque em V sempre dá o golpe rápido' },
   { key: 'crouchToggle', label: 'Agachar alterna (em vez de segurar)', type: 'toggle' },
   { key: 'aimToggle', label: 'Mirar alterna (em vez de segurar)', type: 'toggle' },

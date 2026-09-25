@@ -62,7 +62,12 @@ function knifeModel() {
   g.add(blade, tip, guard, handle); g.userData = { L: 0.3, muzzleZ: -0.23, knife: true };
   return g;
 }
-const spring = (s, target, k, d, dt) => { const a = (target - s.x) * k - s.v * d; s.v += a * dt; s.x += s.v * dt; return s.x; };
+/** Mola amortecida com subpassos: estável mesmo com um quadro lento (antes explodia e a arma "pulava"). */
+const spring = (s, target, k, d, dt) => {
+  const n = Math.min(12, Math.ceil(dt / (1 / 120))), h = dt / n;
+  for (let i = 0; i < n; i++) { const a = (target - s.x) * k - s.v * d; s.v += a * h; s.x += s.v * h; }
+  return s.x;
+};
 const smooth = t => t * t * (3 - 2 * t);
 
 export class ViewModel {
@@ -78,13 +83,13 @@ export class ViewModel {
     const flashMat = new THREE.MeshBasicMaterial({ color: 0xffc070, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false });
     this.flash = new THREE.Group();
     for (let i = 0; i < 3; i++) { const p = new THREE.Mesh(new THREE.PlaneGeometry(0.34, 0.1), flashMat); p.rotation.z = i * Math.PI / 3; this.flash.add(p); }
-    this.light = new THREE.PointLight(0xffaa44, 0, 8); this.flashT = 0;
+    this.light = new THREE.PointLight(0xffaa44, 0, 8); this.flashT = 0; this.root.add(this.light);
     this.style = OPERATOR_STYLES[0];
   }
   setWeapon(id, style = this.style) {
     const upgrade = id && this.gun && !this.gun.userData.real && hasRealGun(id);   // GLB chegou depois
     if (id === this.weaponId && style === this.style && !upgrade) return;
-    this.weaponId = id; this.style = style; this.root.clear(); this.gun = null;
+    this.weaponId = id; this.style = style; this.root.clear(); this.root.add(this.light); this.gun = null;   // luz persistente: nº de luzes nunca muda (evita recompilar shaders)
     if (!id) return;
     const pistolCls = classOf(id) === 'pistol', real = realArms(pistolCls ? ARM_POSE.pistol : ARM_POSE.long);
     const gun = id === 'knife' ? knifeModel() : realGun(id) || gunModel(id), arms = real || armsModel(style);
@@ -96,7 +101,7 @@ export class ViewModel {
     if (!real && pistol) { left.position.set(-0.03, -0.12, -0.02); left.rotation.set(0.3, -0.2, -0.9); }
     this.leftRest.copy(left.position); this.leftRot.copy(left.rotation);
     this.flash.position.set(0, 0.02, gun.userData.muzzleZ - 0.05); this.light.position.copy(this.flash.position);
-    this.root.add(gun, arms, this.flash, this.light); this.flash.visible = false;
+    this.root.add(gun, arms, this.flash); this.flash.visible = false;
     this.gun = gun; this.arms = arms; this.left = left; this.drawT = 0;
     // ADS: sobe a arma até a linha de visada (topo do modelo) ficar exatamente no centro da tela
     this.root.remove(gun); gun.updateMatrixWorld(true);                       // caixa no espaço da própria arma

@@ -5,6 +5,9 @@ export class Effects {
   constructor(scene) {
     this.scene = scene; this.live = [];
     this.tracerPool = []; this.sparkPool = []; this.boomPool = [];
+    // UMA luz de explosão fixa na cena (intensidade 0 quando ociosa): adicionar/remover luzes
+    // muda a contagem de luzes e força o Three.js a recompilar TODOS os shaders (travada)
+    this.boomLight = new THREE.PointLight(0xff9933, 0, 40); this.boomLight.position.y = -9999; scene.add(this.boomLight);
     this.tracerMat = new THREE.LineBasicMaterial({ color: 0xffe0a0, transparent: true, opacity: 0.85 });
   }
   tracer(from, to) {
@@ -22,7 +25,6 @@ export class Effects {
       e = new THREE.Group();
       e.add(new THREE.Mesh(new THREE.SphereGeometry(1, 16, 12), new THREE.MeshBasicMaterial({ color: 0xffa040, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false })));
       e.add(new THREE.Mesh(new THREE.SphereGeometry(1, 12, 10), new THREE.MeshStandardMaterial({ color: 0x333028, transparent: true, depthWrite: false })));
-      e.add(new THREE.PointLight(0xff9933, 0, radius * 4));
     }
     e.position.set(p.x, p.y, p.z); this.scene.add(e);
     this.live.push({ o: e, t: 2.5, total: 2.5, boom: true, radius, pool: this.boomPool });
@@ -48,7 +50,8 @@ export class Effects {
     for (let i = this.live.length - 1; i >= 0; i--) {
       const f = this.live[i]; f.t -= dt;
       if (f.boom) {
-        const age = f.total - f.t, [fire, smoke, light] = f.o.children;
+        const age = f.total - f.t, [fire, smoke] = f.o.children, light = this.boomLight;
+        if (age < 0.35) { light.position.copy(f.o.position); light.distance = f.radius * 4; }
         fire.scale.setScalar(0.5 + age * f.radius * 1.8); fire.material.opacity = Math.max(0, 1 - age * 3);
         smoke.scale.setScalar(1 + age * 3); smoke.position.y = age * 1.5; smoke.material.opacity = Math.max(0, 0.7 - age * 0.3);
         light.intensity = Math.max(0, 60 - age * 200);

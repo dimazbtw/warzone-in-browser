@@ -107,6 +107,9 @@ export class GameSession {
     }
     for (const id of Object.keys(this.cfg?.weapons ?? {})) { const g = characters.gun(id); g.position.y = -500; tmp.add(g); }
     this.effects.smoke({ x: 0, y: -500, z: 0 }, 1, 0.01);
+    this.effects.explosion({ x: 0, y: -500, z: 0 }, 1); this.effects.tracer(new THREE.Vector3(0, -500, 0), new THREE.Vector3(1, -500, 0)); this.effects.spark(new THREE.Vector3(0, -500, 0));
+    w.lootR.prewarm(Object.keys(this.cfg?.weapons ?? {}));
+    for (const k of w.lootR.kinds.values()) { k.mesh.count = 1; k.mesh.setMatrixAt(0, new THREE.Matrix4().makeTranslation(0, -500, 0)); }
     this.vm.setWeapon('rifle');
     w.scene.add(tmp);
     try { w.renderer.compile(w.scene, w.camera); } catch (e) { console.warn('warmup', e); }

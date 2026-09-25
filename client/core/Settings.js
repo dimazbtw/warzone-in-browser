@@ -9,7 +9,7 @@ export const DEFAULTS = {
   volume: 0.8, sfxVolume: 1, musicVolume: 0.35,
   quality: (globalThis.navigator?.hardwareConcurrency ?? 4) >= 8 ? 'high' : 'medium',           // 'low' | 'medium' | 'high'
   showFps: false, damageNumbers: true, crouchToggle: false, aimToggle: false,
-  lastMode: { squadSize: 2, difficulty: 'normal', players: 40 }, lobbyWeapon: 'rifle', keys: {}, knifeHold: 3,
+  lastMode: { squadSize: 2, difficulty: 'normal', players: 40 }, lobbyWeapon: 'rifle', keys: {}, knifeHold: 3, dynamicRes: true,
 };
 export const QUALITY = {
   low:    { pixelRatio: 0.75, shadows: false, shadowMap: 1024, bloom: false, grass: 0,    trees: 0.5, viewDistance: 260, post: false },

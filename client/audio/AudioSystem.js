@@ -48,11 +48,18 @@ export class AudioSystem {
   }
   out(pos) {
     if (!pos) return this.master;
-    const p = this.ctx.createPanner(); p.panningModel = 'HRTF'; p.distanceModel = 'inverse'; p.refDistance = 4; p.maxDistance = 400; p.rolloffFactor = 1.1;
+    // HRTF só para sons próximos (é caro); os distantes usam equalpower
+    const p = this.ctx.createPanner(); p.panningModel = this.dist(pos) < 25 ? 'HRTF' : 'equalpower'; p.distanceModel = 'inverse'; p.refDistance = 4; p.maxDistance = 400; p.rolloffFactor = 1.1;
     p.positionX.value = pos.x; p.positionY.value = pos.y ?? 1; p.positionZ.value = pos.z; p.connect(this.master); return p;
   }
+  /** Limite de vozes simultâneas: tiroteio com dezenas de bots criava centenas de nós de áudio por segundo. */
+  voice(pos, len) {
+    if (pos && this.dist(pos) > 260) return false;                 // inaudível mesmo
+    if ((this.voices ?? 0) > (pos ? 28 : 40)) return false;         // sons locais têm prioridade
+    this.voices = (this.voices ?? 0) + 1; setTimeout(() => { this.voices--; }, (len + 0.1) * 1000); return true;
+  }
   burst({ freq = 1200, len = 0.18, vol = 0.6, type = 'lowpass', pos, verb = 0, q = 0.7, attack = 0, delay = 0 } = {}) {
-    if (!this.ctx) return; const c = this.ctx, s = c.createBufferSource(), t = c.currentTime + delay; s.buffer = this.noise;
+    if (!this.ctx || !this.voice(pos, len + delay)) return; const c = this.ctx, s = c.createBufferSource(), t = c.currentTime + delay; s.buffer = this.noise;
     s.playbackRate.value = 0.8 + Math.random() * 0.4;
     const f = c.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
     const g = c.createGain();
@@ -64,7 +71,7 @@ export class AudioSystem {
   }
   dist(pos) { return pos && this.lp ? Math.hypot(pos.x - this.lp.x, pos.z - this.lp.z) : 0; }
   tone(freq, len, vol = 0.12, type = 'square', pos) {
-    if (!this.ctx) return; const c = this.ctx, o = c.createOscillator(); o.type = type; o.frequency.value = freq;
+    if (!this.ctx || !this.voice(pos, len)) return; const c = this.ctx, o = c.createOscillator(); o.type = type; o.frequency.value = freq;
     const g = c.createGain(); g.gain.setValueAtTime(vol, c.currentTime); g.gain.exponentialRampToValueAtTime(0.001, c.currentTime + len);
     o.connect(g).connect(this.out(pos)); o.start(); o.stop(c.currentTime + len);
   }

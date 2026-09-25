@@ -12,6 +12,10 @@ const $ = id => document.getElementById(id);
 const STATE = { alive: 'VIVO', downed: 'ABATIDO', awaiting: 'RETORNANDO', eliminated: 'ELIMINADO', freefall: 'QUEDA LIVRE', parachute: 'PARAQUEDAS', aircraft: 'AERONAVE' };
 /** Rótulo curto da tecla configurada para a ação (ex.: [Q]). */
 const keyHint = action => { const k = [].concat(KEYMAP[action] ?? [])[0]; return k ? `<kbd>${keyName(k)}</kbd>` : ''; };
+/** Escreve no DOM só quando o conteúdo muda (reescrever todo quadro força layout e recarrega imagens). */
+const _htmlCache = new Map();
+const setHtml = (id, html) => { if (_htmlCache.get(id) === html) return; _htmlCache.set(id, html); document.getElementById(id).innerHTML = html; };
+const setText = (id, t) => { if (_htmlCache.get(id) === t) return; _htmlCache.set(id, t); document.getElementById(id).textContent = t; };
 const RAR = { common: '#bbb', uncommon: '#6fd16f', rare: '#4fa8ff', epic: '#b36bff', legendary: '#ffb13a' };
 const PX_PER_DEG = 3.2;
 
@@ -97,8 +101,8 @@ export class HUDSystem {
     if (tr !== this._tr) { $('topright').innerHTML = tr; this._tr = tr; }
     const z = s.zone, zi = y.zone, mm = Math.floor(Math.max(0, z.t) / 60), ss = String(Math.ceil(Math.max(0, z.t)) % 60).padStart(2, '0');
     const bearing = ((zi.bearing * 180 / Math.PI) + 360) % 360;
-    $('zoneInfo').innerHTML = `<div class="zrow"><span class="zt"><em>${z.phase + 1}</em>${ICON.timer}${mm}:${ss}</span><span class="zt gas ${z.state === 'closing' ? 'on' : ''}">${ICON.storm}${z.state === 'closing' ? 'FECHANDO' : z.state === 'waiting' ? 'PARADA' : 'FINAL'}</span><span class="zt ${s.match.resurgence ? 'ok' : 'off'}">${ICON.resurgence}${s.match.resurgence ? 'RETORNO' : 'OFF'}</span></div>
-      ${zi.outside > 0 ? `<div class="zwarn">FORA DA ZONA · ${Math.round(zi.outside)} m ➜ ${Math.round(bearing)}° · ${z.dps}/s</div>` : ''}${y.radar ? '<div class="zwarn radar">📡 RADAR ATIVO</div>' : ''}`;
+    setHtml('zoneInfo', `<div class="zrow"><span class="zt"><em>${z.phase + 1}</em>${ICON.timer}${mm}:${ss}</span><span class="zt gas ${z.state === 'closing' ? 'on' : ''}">${ICON.storm}${z.state === 'closing' ? 'FECHANDO' : z.state === 'waiting' ? 'PARADA' : 'FINAL'}</span><span class="zt ${s.match.resurgence ? 'ok' : 'off'}">${ICON.resurgence}${s.match.resurgence ? 'RETORNO' : 'OFF'}</span></div>
+      ${zi.outside > 0 ? `<div class="zwarn">FORA DA ZONA · ${Math.round(zi.outside)} m ➜ ${Math.round(bearing)}° · ${z.dps}/s</div>` : ''}${y.radar ? '<div class="zwarn radar">📡 RADAR ATIVO</div>' : ''}`);
     // bússola
     const hd = ((-v.yaw * 180 / Math.PI) % 360 + 360) % 360;
     $('compassStrip').style.transform = `translateX(${260 - hd * PX_PER_DEG}px)`;
@@ -156,26 +160,26 @@ export class HUDSystem {
     // contrato
     const k = y.contract, ce = $('contract');
     if (k) { ce.classList.remove('hidden'); const desc = { hunt: `Elimine <b>${k.target}</b> (última posição marcada)`, scavenger: `Encontre o esconderijo ${k.progress + 1}/${k.goal}`, capture: `Domine a área ${k.contested ? '<b style="color:#ff5050">CONTESTADA</b>' : ''}`, survive: 'Mantenha o squad vivo', collect: `Colete inteligência ${k.progress}/${k.goal}` }[k.type];
-      ce.innerHTML = `<h4>CONTRATO · ${k.name.toUpperCase()}</h4><div>${desc}</div><div class="muted">${k.timeLeft}s restantes</div>${k.goal > 1 ? `<div class="bar"><i style="width:${Math.min(100, k.progress / k.goal * 100)}%"></i></div>` : ''}`; }
+      setHtml('contract', `<h4>CONTRATO · ${k.name.toUpperCase()}</h4><div>${desc}</div><div class="muted">${k.timeLeft}s restantes</div>${k.goal > 1 ? `<div class="bar"><i style="width:${Math.min(100, k.progress / k.goal * 100)}%"></i></div>` : ''}`); }
     else ce.classList.add('hidden');
     // respawn / espectador
     const rs = $('respawn');
-    if (y.s === 'awaiting') { rs.className = ''; rs.innerHTML = `<div>RETORNO EM</div><div class="big">${Math.ceil(y.respawnIn)}s</div><div class="muted">${v.spectatingName ? `assistindo ${v.spectatingName} · [ ] trocar` : ''} · aliados vivos aceleram · abates do squad descontam</div>`; }
-    else if (y.s === 'eliminated') { rs.className = 'final'; rs.innerHTML = `<div class="big">ELIMINADO</div><div class="muted">${v.spectatingName ? `espectador: ${v.spectatingName} · [ ] trocar` : 'aguarde o fim da partida'}${s.match.resurgence ? ' · um aliado pode te trazer de volta na estação' : ''}</div>`; }
+    if (y.s === 'awaiting') { rs.className = ''; setHtml('respawn', `<div>RETORNO EM</div><div class="big">${Math.ceil(y.respawnIn)}s</div><div class="muted">${v.spectatingName ? `assistindo ${v.spectatingName} · [ ] trocar` : ''} · aliados vivos aceleram · abates do squad descontam</div>`); }
+    else if (y.s === 'eliminated') { rs.className = 'final'; setHtml('respawn', `<div class="big">ELIMINADO</div><div class="muted">${v.spectatingName ? `espectador: ${v.spectatingName} · [ ] trocar` : 'aguarde o fim da partida'}${s.match.resurgence ? ' · um aliado pode te trazer de volta na estação' : ''}</div>`); }
     else rs.className = 'hidden';
     // centro / prompt
     let msg = now < this.center.until ? this.center.text : '';
     if (y.s === 'aircraft') msg = 'NA AERONAVE — ESPAÇO PARA SALTAR';
     else if (y.s === 'downed') msg = `ABATIDO — ♥ ${y.bleed}`;
     else if (y.s === 'freefall' && !msg) msg = `QUEDA LIVRE · ${Math.round(y.y)} m · Espaço abre o paraquedas`;
-    $('center').textContent = msg;
-    $('toast').textContent = now < this.toast.until ? this.toast.text : '';
-    const pr = $('prompt'); pr.style.display = v.prompt ? 'block' : 'none'; pr.innerHTML = v.prompt ?? '';
+    setText('center', msg);
+    setText('toast', now < this.toast.until ? this.toast.text : '');
+    const pr = $('prompt'); pr.style.display = v.prompt ? 'block' : 'none'; setHtml('prompt', v.prompt ?? '');   // o card do loot tem <img>: recriar a cada quadro fazia piscar
     // mira / hitmarker / direção do dano
     $('crosshair').style.opacity = v.hideCrosshair ? 0 : 1;
     if (now > this.hitT) $('hitmarker').style.opacity = 0;
     this.dirs = this.dirs.filter(d => d.until > now);
-    $('dmgDirs').innerHTML = this.dirs.map(d => `<i style="transform:rotate(${(d.angle + v.yaw) * -180 / Math.PI}deg);opacity:${(d.until - now) / 700}"></i>`).join('');
+    setHtml('dmgDirs', this.dirs.map(d => `<i style="transform:rotate(${(d.angle + v.yaw) * -180 / Math.PI}deg);opacity:${(d.until - now) / 700}"></i>`).join(''));
     $('scope').classList.toggle('hidden', !v.sniperScope);
     const br = $('breath'); br.classList.toggle('hidden', !v.breath);
     if (v.breath) br.innerHTML = `<span>${v.breath.hold ? 'PRENDENDO A RESPIRAÇÃO' : `SEGURE ${keyHint('sprint')} PARA FOCAR`}</span><div><i style="width:${v.breath.left / 5 * 100}%"></i></div>`;
