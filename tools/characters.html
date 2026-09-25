@@ -25,10 +25,10 @@ const STATES = [
 await assets.wait(20000);
 const only = q.get('only'); const chosen = only ? only.split(',').map(Number) : null;
 const list = STATES.filter((_, i) => !chosen || chosen.includes(i)).map(([label, s], j) => { const i = chosen ? j : j;
-  const c = characters.create({ operator: i % 4 }); scene.add(c.root, c.weapon); c.setWeapon(s.state === 'alive' || s.state === 'downed' ? (s.weapon ?? 'rifle') : null);
+  const c = characters.create({ operator: i % 2 }); scene.add(c.root, c.weapon); c.setWeapon(s.state === 'alive' || s.state === 'downed' ? (s.weapon ?? 'rifle') : null);
   return chosen ? { c, s, label, x: (j - (chosen.length - 1) / 2) * 2.4, z: 0 } : { c, s, label, x: (i % 8) * 2.2 - 7.7, z: Math.floor(i / 8) * -3.5 };
 });
-document.getElementById('lbl').textContent = `${characters.stats.real ? 'MODELO REAL (Higgsfield)' : 'humanoide procedural'} · ` + list.map(l => l.label).join(' | ');
+document.getElementById('lbl').textContent = `${characters.stats.real ? 'OPERADORES (auto-rig)' : 'humanoide procedural'} · ` + list.map(l => l.label).join(' | ');
 const T = Number(q.get('t') ?? 1.3); let t = 0; const dt = 1 / 60;
 function step(d) { for (const l of list) { const s = l.s, v = s.v ?? 0; l.c.animator.update(d, { x: l.x, y: s.y ?? 0, z: l.z, yaw: 0, pitch: s.pitch ?? 0, vx: 0, vz: -v, state: s.state, stance: s.stance ?? 'stand', sprint: s.sprint ?? 0, ads: s.ads ?? 0, slide: s.slide ?? 0, mantle: 0, grounded: s.grounded ?? true, action: s.action ?? null, weapon: l.c.weaponId }); } }
 while (t < T) { step(dt); t += dt; }

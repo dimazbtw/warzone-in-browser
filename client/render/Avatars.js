@@ -14,14 +14,14 @@ export class Avatars {
   constructor(scene, geo) {
     this.scene = scene; this.geo = geo; this.viewDist = 260; this.map = new Map(); this.dead = []; this.frame = 0;
     this.radarMat = new THREE.SpriteMaterial({ color: 0xff3333, depthTest: false });
-    this.canopyMat = mat(0x7a6a2a, { side: THREE.DoubleSide });
+    this.canopyMat = mat(0x8a7a3a, { side: THREE.DoubleSide, emissive: 0x4a3f1c, emissiveIntensity: 0.6 });
   }
   setGeo(geo) { this.geo = geo; }
 
   make(o, lite = false) {
     const c = characters.create({ operator: o.op ?? 0, name: o.n, ally: !!o.a, lite });
     const chute = new THREE.Group();
-    const canopy = new THREE.Mesh(new THREE.SphereGeometry(2.4, 14, 6, 0, Math.PI * 2, 0, Math.PI / 3), this.canopyMat);
+    const canopy = new THREE.Mesh(new THREE.SphereGeometry(2.4, 28, 8, 0, Math.PI * 2, 0, Math.PI / 3), this.canopyMat);
     canopy.position.y = 4.6; canopy.scale.set(1.35, 0.5, 0.85); chute.add(canopy);
     const lm = new THREE.LineBasicMaterial({ color: 0x222222 });
     for (const [x, z] of [[-1.9, -0.8], [1.9, -0.8], [-1.9, 0.8], [1.9, 0.8]]) chute.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 1.9, 0), new THREE.Vector3(x, 5.0, z)]), lm));
@@ -54,7 +54,7 @@ export class Avatars {
     for (const o of list) {
       seen.add(o.id);
       let c = this.map.get(o.id);
-      if (c && !c.real && characters.soldierTemplate()) { this.scene.remove(c.root, c.weapon); c = null; }
+      if (c && !c.real && characters.template(o.op ?? 0)) { this.scene.remove(c.root, c.weapon); c = null; }
       if (c?.useFar === undefined && c) c.useFar = false;   // modelo real chegou: troca
       if (!c) { c = this.make(o); this.map.set(o.id, c); }
       c.last = o;
@@ -62,7 +62,7 @@ export class Avatars {
       // longe demais (além da neblina): nem desenha nem anima
       if (dist > (this.scene.fog ? this.scene.fog.far * 0.8 : this.viewDist) && o.s !== 'parachute' && o.s !== 'freefall') { c.root.visible = false; c.weapon.visible = false; c.initialized = false; continue; }
       // LOD: modelo real (18k vértices) só perto; longe usa o humanoide leve com o mesmo esqueleto
-      if (c.real) {
+      if (c.real && !c.animator.bakedArms) {   // modelos leves (auto-rig, ~7k vértices) não precisam de LOD
         const far = dist > (c.useFar ? 36 : 44);   // histerese evita piscar na borda
         if (far !== !!c.useFar) {
           c.useFar = far;

@@ -19,13 +19,13 @@ export const MOVE_DEFAULTS = {
 
 export function newBody() {
   return { pos: { x: 0, y: 0, z: 0 }, vel: { x: 0, y: 0, z: 0 }, yaw: 0, stance: 'stand', grounded: true, stamina: 100, staminaBlockUntil: 0,
-    tacActive: false, sprinting: false, ads: false, slide: null, mantle: null, climb: null, prevCrouch: false, prevJump: false, slideCooldownUntil: 0 };
+    tacActive: false, sprinting: false, ads: false, slide: null, mantle: null, climb: null, prevCrouch: false, prevJump: false, slideCooldownUntil: 0, clock: 0 };
 }
 
 /** Copia campos de movimento (para snapshot/reconciliação). */
 export function copyBody(src, dst = newBody()) {
   Object.assign(dst.pos, src.pos); Object.assign(dst.vel, src.vel);
-  for (const k of ['yaw', 'stance', 'grounded', 'stamina', 'staminaBlockUntil', 'tacActive', 'sprinting', 'ads', 'prevCrouch', 'prevJump', 'slideCooldownUntil']) dst[k] = src[k];
+  for (const k of ['yaw', 'stance', 'grounded', 'stamina', 'staminaBlockUntil', 'tacActive', 'sprinting', 'ads', 'prevCrouch', 'prevJump', 'slideCooldownUntil', 'clock']) dst[k] = src[k];
   dst.slide = src.slide && { ...src.slide }; dst.mantle = src.mantle && { ...src.mantle }; dst.climb = src.climb && { ...src.climb };
   return dst;
 }
@@ -37,6 +37,9 @@ export function wishDir(yaw, input) {
 
 /** Passo em solo (inclui slide, mantle/vault, escalada, stamina). */
 export function stepGround(b, input, dt, now, cfg, geo, opts = {}) {
+  // relógio do próprio corpo: avança com o dt de cada input, igual no cliente e no servidor
+  // (usar o relógio de parede fazia cooldowns de slide/stamina divergirem → correções)
+  b.clock = (b.clock ?? 0) + dt; now = b.clock;
   const m = cfg.movement, M = { ...MOVE_DEFAULTS, ...(m.advanced || {}) }, ev = {};
   b.yaw = input.yaw;
   const crouchPressed = input.crouch && !b.prevCrouch, jumpPressed = input.jump && !b.prevJump;

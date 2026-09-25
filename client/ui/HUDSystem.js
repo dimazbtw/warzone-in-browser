@@ -57,6 +57,13 @@ export class HUDSystem {
       <div class="inv-slot"><small>DINHEIRO</small><b style="color:var(--green)">$${inv.cash}</b><small>☠ ${you.stats?.kills ?? 0} eliminações</small></div></div>
       <h3 style="margin-top:12px">ESQUADRÃO</h3>${squad.map(m => `<div class="inv-slot" style="margin-top:4px"><b>${m.name}</b> <small>${STATE[m.state] ?? m.state}</small></div>`).join('') || '<small>sozinho</small>'}`;
   }
+  /** Tiro local: abre a cruz e dá um tranco no contador. */
+  fired() { this.bloom = Math.min(18, (this.bloom ?? 0) + 5); this.magKick = performance.now() + 60; }
+  /** Banner de eliminação no centro da tela. */
+  killBanner(name, { head = false, finisher = false } = {}) {
+    const el = $('killBanner'); el.innerHTML = `<i>☠</i><div><b>${finisher ? 'FINALIZADO' : head ? 'TIRO NA CABEÇA' : 'ELIMINADO'}</b><span>${name}</span></div>`;
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  }
   shotPing(x, z) { this.shots.push({ x, z, until: performance.now() + 1500 }); }
 
   buildCompass() {
@@ -89,21 +96,34 @@ export class HUDSystem {
     place('mkZone', z.to.x, z.to.z);
     const cpt = y.contract && (y.contract.area ?? y.contract.cache ?? y.contract.lastSeen); place('mkContract', cpt?.x, cpt?.z);
     // killfeed
-    $('killfeed').innerHTML = this.feed.filter(f => now - f.at < 7000).map(f => `<div class="${f.me ? 'me' : ''}">${f.text}</div>`).join('');
-    // squad + eu
+    const kf = this.feed.filter(f => now - f.at < 7000).map(f => `<div class="${f.me ? 'me' : ''} ${now - f.at < 250 ? 'new' : ''} ${now - f.at > 6500 ? 'out' : ''}">${f.text}</div>`).join('');
+    if (kf !== this._kf) { $('killfeed').innerHTML = kf; this._kf = kf; }
+    // squad + eu — rastro de dano: a barra fantasma segura 0,4 s e desce devagar
     const inv = y.inv, cfgH = v.cfg.health;
+    if (this.hpGhost === undefined || y.hp > this.hpGhost) { this.hpGhost = y.hp; this.hpHold = now; }
+    else if (y.hp < this.lastHp) this.hpHold = now + 400;
+    if (now > this.hpHold) this.hpGhost = Math.max(y.hp, this.hpGhost - (now - (this.lastHud ?? now)) * 0.06);
+    this.lastHp = y.hp; this.lastHud = now;
     const plates = [0, 1, 2].map(i => `<i style="--f:${Math.max(0, Math.min(1, (y.ar - i * cfgH.plates.hpPerPlate) / cfgH.plates.hpPerPlate)) * 100}%"></i>`).join('');
     $('squad').innerHTML = s.squad.map(m => `<div class="sq"><span class="n st-${m.state}">${m.name}${m.connected ? '' : ' ⚠'}</span><span class="r st-${m.state}">${STATE[m.state] ?? m.state}${m.respawnIn != null ? ` ${m.respawnIn}s` : ''}${m.bleed != null ? ` ♥${m.bleed}` : ''} · ${m.dist} m</span>
       ${['alive', 'freefall', 'parachute'].includes(m.state) ? `<div class="bars">${[0, 1, 2].map(i => `<i style="--f:${Math.max(0, Math.min(1, (m.armor - i * 50) / 50)) * 100}%"></i>`).join('')}</div><div class="hp"><i style="width:${m.hp}%"></i></div>` : ''}</div>`).join('')
       + `<div class="sq me"><span class="n">${v.myName}</span><span class="r cash">$${inv?.cash ?? 0}</span>
-      <div class="bars">${plates}</div><div class="hp"><i style="width:${Math.max(0, y.hp)}%"></i></div><div class="stam"><i style="width:${y.stam}%"></i></div></div>`;
+      <div class="bars">${plates}</div><div class="hp ${y.hp < 35 && y.s === 'alive' ? 'low' : ''}"><b style="width:${this.hpGhost}%"></b><i style="width:${Math.max(0, y.hp)}%"></i></div><div class="stam"><i style="width:${y.stam}%"></i></div></div>`;
     // arma
     if (inv) {
       const w = inv[inv.active], def = w && v.cfg.weapons[w.id], other = inv[inv.active === 'primary' ? 'secondary' : 'primary'];
+      const R = w && v.cfg.rarity?.[w.rarity], rc = RAR[w?.rarity] ?? '#bbb', res = def ? inv.ammo[def.ammo] : 0, max = def ? Math.round(def.mag * (R?.mag ?? 1)) : 1;
+      const low = w && w.mag <= max * 0.25, empty = w && w.mag === 0 && res === 0;
       $('weapon').innerHTML = `<div class="inv"><span>🛡 ${inv.plates}</span><span>✚ ${inv.heals}</span><span>💣 ${inv.lethal}</span><span>☁ ${inv.tactical ?? 0}</span></div>
-        <div class="mag" style="color:${def && w.mag <= def.mag * 0.25 ? '#ff5050' : '#fff'}">${w?.mag ?? 0} <span class="res">/ ${def ? inv.ammo[def.ammo] : 0}</span></div>
-        <div class="wn">${def?.name ?? '—'}</div><div class="other">${other ? v.cfg.weapons[other.id]?.name : '— slot vazio —'}</div>`;
+        <div class="mag ${low ? 'low' : ''} ${this.magKick > now ? 'kick' : ''}">${w?.mag ?? 0}<span class="res">/ ${res}</span></div>
+        <div class="magbar"><i style="width:${Math.min(100, (w?.mag ?? 0) / max * 100)}%;background:${low ? '#ff5050' : rc}"></i></div>
+        <div class="wn" style="border-right:3px solid ${rc}"><span style="color:${rc}">${R?.label ?? ''}</span> ${def?.name ?? '—'}</div><div class="other">${other ? v.cfg.weapons[other.id]?.name : '— slot vazio —'}</div>
+        ${empty ? '<div class="warnAmmo">SEM MUNIÇÃO</div>' : low && y.action?.type !== 'reload' ? '<div class="warnAmmo">[R] RECARREGUE</div>' : ''}`;
     }
+    // ponto vermelho do ADS e abertura da cruz ao atirar
+    $('adsDot').classList.toggle('on', !!v.ads && !v.sniperScope);
+    this.bloom = Math.max(0, (this.bloom ?? 0) - (now - (this.lastBloom ?? now)) * 0.02); this.lastBloom = now;
+    $('crosshair').style.setProperty('--s', `${Math.round((v.spread ?? 6) + this.bloom)}px`);
     // ação com tempo
     const ab = $('actionBar');
     if (y.action) { ab.classList.remove('hidden'); ab.firstElementChild.style.width = `${(1 - y.action.left / y.action.total) * 100}%`; ab.lastElementChild.textContent = { reload: 'RECARREGANDO', plate: 'APLICANDO PLACA', heal: 'CURANDO', revive: 'REVIVENDO' }[y.action.type] ?? y.action.type; }
@@ -127,7 +147,7 @@ export class HUDSystem {
     $('toast').textContent = now < this.toast.until ? this.toast.text : '';
     const pr = $('prompt'); pr.style.display = v.prompt ? 'block' : 'none'; pr.innerHTML = v.prompt ?? '';
     // mira / hitmarker / direção do dano
-    $('crosshair').style.opacity = v.hideCrosshair ? 0 : 1; $('crosshair').style.setProperty('--s', `${v.spread}px`);
+    $('crosshair').style.opacity = v.hideCrosshair ? 0 : 1;
     if (now > this.hitT) $('hitmarker').style.opacity = 0;
     this.dirs = this.dirs.filter(d => d.until > now);
     $('dmgDirs').innerHTML = this.dirs.map(d => `<i style="transform:rotate(${(d.angle + v.yaw) * -180 / Math.PI}deg);opacity:${(d.until - now) / 700}"></i>`).join('');

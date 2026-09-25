@@ -37,15 +37,23 @@ export class MovementSystem {
   tick(dt) {
     const now = this.ctx.now();
     for (const p of this.ctx.players.values()) {
-      p.moveBudget = Math.min(0.3, (p.moveBudget ?? 0) + dt);
+      // orçamento de tempo cresce só com o relógio do servidor (anti speed-hack); até 1 s de
+      // inputs atrasados (engasgo do navegador/rede) é reaplicado inteiro, passo a passo
+      p.moveBudget = Math.min(1, (p.moveBudget ?? 0) + dt);
       let steps = 0;
-      while (p.inputQueue?.length && p.moveBudget >= p.inputQueue[0].dt - 1e-4 && steps < 8) {
+      while (p.inputQueue?.length && p.moveBudget >= p.inputQueue[0].dt - 1e-4 && steps < 30) {
         const inp = p.inputQueue.shift();
         p.moveBudget -= inp.dt; p.input = inp; if (inp.seq) p.lastSeq = inp.seq;
-        this.step(p, inp, inp.dt, now); steps++;
+        this.step(p, inp, inp.dt, now); steps++; p.lastInputAt = now;
       }
-      // sem inputs chegando (lag/idle/desconectado): continua simulando com o último
-      if (!steps && !p.inputQueue?.length && p.moveBudget >= 0.15) { p.moveBudget -= dt; this.step(p, p.input, dt, now); }
+      // humano sem inputs: ESPERA (não extrapola — extrapolar diverge da predição do cliente e gera
+      // correção/"borracha"). Só depois de 1 s parado (lag grave/desconexão) a física segue sozinha,
+      // sem movimento, para gravidade/zona continuarem valendo. Bots comandam p.input diretamente.
+      const stale = now - (p.lastInputAt ?? -1e9) > 1;
+      if (!steps && !p.inputQueue?.length && (p.isBot || stale)) {
+        p.moveBudget = 0;
+        this.step(p, p.isBot ? p.input : { ...p.input, mx: 0, mz: 0, jump: false, sprint: false, tac: false }, dt, now);
+      }
       p.record(now);
     }
   }

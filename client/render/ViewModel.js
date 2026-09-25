@@ -37,6 +37,10 @@ export class ViewModel {
     this.flash.position.set(0, 0.02, gun.userData.muzzleZ - 0.05); this.light.position.copy(this.flash.position);
     this.root.add(gun, arms, this.flash, this.light); this.flash.visible = false;
     this.gun = gun; this.arms = arms; this.left = left; this.drawT = 0;
+    // ADS: sobe a arma até a linha de visada (topo do modelo) ficar exatamente no centro da tela
+    this.root.remove(gun); gun.updateMatrixWorld(true);                       // caixa no espaço da própria arma
+    const bb = new THREE.Box3().setFromObject(gun), sightY = (bb.max.y - 0.012) * this.root.scale.y; this.root.add(gun);
+    this.aimPos = [0, -sightY, id === 'sidearm' ? -0.36 : -0.27];
   }
   fire(recoil = 1) {
     this.kz.v += 1.6 * recoil; this.kr.v += 9 * recoil; this.ky.v += (Math.random() - 0.5) * 3 * recoil; this.fireRoll = (Math.random() - 0.5) * 0.04 * recoil;
@@ -71,7 +75,7 @@ export class ViewModel {
     const breathe = Math.sin(this.t * 1.6) * 0.003 * (1 - this.adsK * 0.7);
 
     // pose-base: quadril ↔ mira ↔ sprint
-    const hip = [0.22, -0.22, -0.4], aim = [0, -0.115, -0.3], spr = [0.2, -0.3, -0.32];
+    const hip = [0.22, -0.22, -0.4], aim = this.aimPos ?? [0, -0.115, -0.3], spr = [0.2, -0.3, -0.32];
     const px = hip[0] + (aim[0] - hip[0]) * this.adsK + (spr[0] - hip[0]) * this.sprintK;
     const py = hip[1] + (aim[1] - hip[1]) * this.adsK + (spr[1] - hip[1]) * this.sprintK;
     const pz = hip[2] + (aim[2] - hip[2]) * this.adsK + (spr[2] - hip[2]) * this.sprintK;

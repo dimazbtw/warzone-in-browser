@@ -131,7 +131,7 @@ export class GameSession {
       case 'lootSpawned': this.world.addLoot(e.item); break;
       case 'lootRemoved': this.world.removeLoot(e.id); break;
       case 'contractBoard': { const b = this.boards.get(e.id); if (b) b.taken = e.taken; this.world.setBoard(e.id, e.taken); break; }
-      case 'killfeed': this.avatars.kill(e.victimId); h.killfeed(`${e.attacker ?? '☣ zona'} ✖ ${e.victim}`, e.attackerId === me || e.victimId === me || this.isAlly(e.victimId)); if (e.attackerId === me) { h.hitmarker(false, true); a.kill(); h.xp('+100 ELIMINAÇÃO'); } break;
+      case 'killfeed': this.avatars.kill(e.victimId); h.killfeed(`${e.attacker ?? '☣ zona'} ✖ ${e.victim}`, e.attackerId === me || e.victimId === me || this.isAlly(e.victimId)); if (e.attackerId === me) { h.hitmarker(false, true); a.kill(); h.xp('+100 ELIMINAÇÃO'); h.killBanner(e.victim, { head: e.part === 'head' || e.headshot, finisher: e.cause === 'finished' }); } break;
       case 'damage':
         if (e.attackerId === me) {
           h.hitmarker(e.part === 'head', false); a.hit(e.part === 'head'); if (e.armorBroken) a.crack();
@@ -238,12 +238,12 @@ export class GameSession {
     if (w.mag - this.shotsSinceSnap <= 0) { if (click) { this.audio.tone(220, 0.04, 0.05); this.net.send(C2S.RELOAD); } return; }
     this.nextFire = now + 60 / def.rpm; this.shotsSinceSnap++;
     this.net.send(C2S.FIRE, { yaw: this.input.yaw, pitch: this.input.pitch });
-    this.vm.fire(def.recoil); this.audio.shot(w.id, null, true);
+    this.vm.fire(def.recoil); this.audio.shot(w.id, null, true); this.hud.fired();
     const cam = this.world.camera, o = cam.getWorldPosition(new THREE.Vector3()), d = cam.getWorldDirection(new THREE.Vector3());
     const wall = this.geo.raycast(o, d, def.range), end = o.clone().addScaledVector(d, wall ?? def.range);
     this.effects.tracer(o.clone().addScaledVector(d, 1.2).add(new THREE.Vector3(0, -0.12, 0)), end); if (wall) this.effects.spark(end);
     // padrão de recuo determinístico por arma (sobe, depois deriva para os lados), escalado pela raridade
-    const n = this.recoilShots = (this.recoilShots ?? 0) + 1, rm = (this.cfg.rarity?.[w.rarity]?.recoil ?? 1) * def.recoil * (y.ads ? 0.6 : 1) * (y.st === 'crouch' ? 0.8 : y.st === 'prone' ? 0.6 : 1);
+    const n = this.recoilShots = (this.recoilShots ?? 0) + 1, rm = (this.cfg.rarity?.[w.rarity]?.recoil ?? 1) * def.recoil * (this.aimNow ? 0.6 : 1) * (y.st === 'crouch' ? 0.8 : y.st === 'prone' ? 0.6 : 1);
     const up = 0.0075 * rm * (1 + Math.min(n, 12) / 12 * 0.6), side = (Math.sin(n * 0.55 + (PATTERN_SEED[w.id] ?? 0)) * 0.6 + (Math.random() - 0.5) * 0.5) * 0.0035 * rm;
     this.input.pitch = Math.min(1.5, this.input.pitch + up); this.input.yaw += side;
     this.recoilDebt = Math.min(0.2, (this.recoilDebt ?? 0) + up * 0.65); this.camKick = (this.camKick ?? 0) + up * 0.6;
@@ -282,6 +282,8 @@ export class GameSession {
 
     // câmera
     const cam = world.camera, st = y.s;
+    // mira (ADS) prevista no cliente: responde no mesmo quadro do clique, sem esperar o servidor
+    const aim = this.aimNow = st === 'alive' && input.aiming && !ACTION_OPTS[y.action?.type]?.blocksAds && !body.slide && !body.mantle && !body.climb;
     let third = false, target = pos, tyaw = input.yaw, tpitch = input.pitch;
     if (st === 'aircraft') { third = true; target = { x: y.x, y: y.y, z: y.z }; }
     else if (st === 'freefall' || st === 'parachute') third = true;
@@ -290,7 +292,7 @@ export class GameSession {
       if (sp) { third = true; target = sp; tyaw = sp.yaw; tpitch = -0.25; } else target = { x: this.snap.zone.x, y: 0, z: this.snap.zone.z };
     }
     if (third) {
-      const dist = st === 'aircraft' ? 28 : st === 'freefall' ? 7 : st === 'parachute' ? 9 : 5, hgt = st === 'aircraft' ? 8 : 2.5;
+      const dist = st === 'aircraft' ? 72 : st === 'freefall' ? 7 : st === 'parachute' ? 9 : 5, hgt = st === 'aircraft' ? 16 : 2.5;
       cam.position.set(target.x + Math.sin(tyaw) * dist * Math.cos(tpitch), target.y + hgt - Math.sin(tpitch) * dist, target.z + Math.cos(tyaw) * dist * Math.cos(tpitch));
       cam.lookAt(target.x, target.y + 1.5, target.z);
     } else if (st === 'awaiting' || st === 'eliminated') {
@@ -300,7 +302,7 @@ export class GameSession {
       // sensação de câmera: bob do passo, inclinação no strafe/slide, afundada do pouso, tranco do tiro
       const sp = Math.hypot(body.vel.x, body.vel.z), moving = body.grounded && sp > 1 && !body.slide;
       this.bobT = (this.bobT ?? 0) + (moving ? dt * (body.sprinting ? 12.5 : 8.5) : 0);
-      const bobA = moving ? Math.min(1, sp / 5) * (y.ads ? 0.25 : 1) * (body.sprinting ? 0.05 : 0.028) : 0;
+      const bobA = moving ? Math.min(1, sp / 5) * (aim ? 0.25 : 1) * (body.sprinting ? 0.05 : 0.028) : 0;
       const side = body.vel.x * Math.cos(input.yaw) - body.vel.z * Math.sin(input.yaw);
       this.roll ??= 0; this.roll += ((-side * 0.006 + (body.slide ? 0.06 : 0) + (moving ? Math.sin(this.bobT) * bobA * 0.15 : 0)) - this.roll) * Math.min(1, dt * 8);
       this.landDip = (this.landDip ?? 0) * Math.max(0, 1 - dt * 7); this.camKick = (this.camKick ?? 0) * Math.max(0, 1 - dt * 14);
@@ -312,9 +314,9 @@ export class GameSession {
     }
     if (window.DEBUG_CAM) { const d = window.DEBUG_CAM; cam.position.set(d.x, d.y, d.z); cam.rotation.set(d.pitch ?? 0, d.yaw ?? 0, 0, 'YXZ'); }   // câmera livre de depuração
     if (this.shake > 0) { cam.position.x += (Math.random() - 0.5) * this.shake; cam.position.y += (Math.random() - 0.5) * this.shake; this.shake = Math.max(0, this.shake - dt * 1.5); }
-    const sniper = y.ads && w?.id === 'marksman' && st === 'alive';
+    const sniper = aim && w?.id === 'marksman' && st === 'alive';
     const baseFov = settings.get('fov');
-    const fov = st === 'alive' ? (y.ads ? (sniper ? 22 : baseFov * 0.72) : body.sprinting ? baseFov + 7 : baseFov) : baseFov;
+    const fov = st === 'alive' ? (aim ? (sniper ? 22 : baseFov * 0.72) : body.sprinting ? baseFov + 7 : baseFov) : baseFov;
     cam.fov += (fov - cam.fov) * Math.min(1, dt * 12); cam.updateProjectionMatrix();
     input.zoomScale = sniper ? 0.35 : 1;
 
@@ -325,7 +327,7 @@ export class GameSession {
     }
 
     this.vm.setWeapon(st === 'alive' ? w?.id ?? null : null);
-    this.vm.update(dt, { ads: y.ads, sprint: body.sprinting, moving: Math.hypot(body.vel.x, body.vel.z) > 1 && body.grounded, speed: Math.hypot(body.vel.x, body.vel.z), slide: !!body.slide, grounded: body.grounded,
+    this.vm.update(dt, { ads: aim, sprint: body.sprinting, moving: Math.hypot(body.vel.x, body.vel.z) > 1 && body.grounded, speed: Math.hypot(body.vel.x, body.vel.z), slide: !!body.slide, grounded: body.grounded,
       action: y.action?.type, actionTime: y.action?.total, mouseDX: input.lastDX ?? 0, mouseDY: input.lastDY ?? 0, visible: st === 'alive', sniperScope: sniper });
     input.lastDX = input.lastDY = 0;
 
@@ -334,12 +336,12 @@ export class GameSession {
     const u = world.grade.uniforms, hurt = Math.max(0, 1 - (performance.now() - this.hurtT) / 600);
     u.damage.value = Math.min(1, Math.max(hurt * 0.8, (100 - y.hp) / 120));
     u.gas.value += ((y.zone.outside > 0 && !['awaiting', 'eliminated', 'aircraft'].includes(st) ? 1 : 0) - u.gas.value) * Math.min(1, dt * 4);
-    u.ads.value += ((y.ads ? 1 : 0) - u.ads.value) * Math.min(1, dt * 8); u.downed.value = st === 'downed' ? 1 : 0;
+    u.ads.value += ((aim ? 1 : 0) - u.ads.value) * Math.min(1, dt * 8); u.downed.value = st === 'downed' ? 1 : 0;
 
     const def = w && this.cfg.weapons[w.id];
     hud.update({ snap: this.snap, cfg: this.cfg, yaw: input.yaw, pos, mapView: this.mapView, geo: this.geo, stations: this.stations, boards: this.boards, others, myName: this.myName,
       prompt: st === 'alive' ? this.promptText() : null,
-      spectatingName: y.spectating && (others.find(o => o.id === y.spectating)?.n), hideCrosshair: y.ads || body.sprinting || st !== 'alive',
+      spectatingName: y.spectating && (others.find(o => o.id === y.spectating)?.n), ads: aim, hideCrosshair: aim || body.sprinting || st !== 'alive',
       spread: def ? (def.spreadHip * 400 + 4) * (Math.hypot(body.vel.x, body.vel.z) > 1 ? 1.5 : 1) : 6, sniperScope: sniper,
       netText: this.meta.mode === 'offline' ? `offline · ${this.meta.label}` : `ping ${Math.round(this.net.rtt * 1000)} ms · correções ${this.pred.corrections}` });
     if (this.shopOpen && !this.nearStation()) this.toggleShop(false);

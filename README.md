@@ -11,7 +11,8 @@ npm test             # 56 testes
 ```
 **Sem servidor:** abra `index.html` servido por qualquer servidor estático (ex.: `python3 -m http.server`) e escolha *Jogar offline*. A simulação inteira do servidor roda num Web Worker, com bots e 3 dificuldades.
 
-Os modelos 3D reais (operador rigado e fuzil gerados no Higgsfield) vêm do CDN. Se quiser uma cópia local, coloque-os em `assets/models/soldier.glb` e `rifle.glb`. Sem eles, o jogo usa modelos procedurais com o mesmo esqueleto.
+Modelos 3D em `assets/models/`: os operadores **Caveira** (`operator_1.glb`) e **Duna** (`operator_2.glb`) e a aeronave KC-10 (`aircraft.glb`). O fuzil de 1ª pessoa vem do CDN do Higgsfield.
+Os operadores são malhas estáticas. O `AutoRig` cria o esqueleto de 24 ossos na hora de carregar, então pernas, quadril, tronco e cabeça são animados por IK, e braços e fuzil ficam presos ao peito. Os retratos do menu são renderizados dos próprios modelos (`tools/portrait.html`). Sem os arquivos, o jogo usa um humanoide procedural.
 - `/`: cliente 3D multiplayer
 - `/client-debug/`: cliente 2D para depurar o servidor
 - `/offline/`: protótipo single-player antigo

@@ -35,7 +35,7 @@ export class Prediction {
     b.stance = you.st; b.grounded = you.grounded ?? true; b.stamina = you.stam; b.tacActive = !!you.tac; b.sprinting = !!you.sprinting;
     b.slide = you.slide ? { ...you.slide } : null; b.mantle = you.mantle ? { ...you.mantle } : null; b.climb = you.climb ? { ...you.climb } : null;
     b.prevJump = !!you.pj; b.prevCrouch = !!you.pc;
-    b.staminaBlockUntil = serverNow + (you.stamBlock ?? -1); b.slideCooldownUntil = serverNow + (you.slideCd ?? -1);
+    b.clock = you.clk ?? b.clock ?? 0; b.staminaBlockUntil = b.clock + (you.stamBlock ?? -1); b.slideCooldownUntil = b.clock + (you.slideCd ?? -1);   // relativos ao relógio do corpo
     this.pending = this.pending.filter(p => p.input.seq > you.seq);
     if (!predictedStates.includes(you.s)) { this.pending.length = 0; this.renderOffset = { x: 0, y: 0, z: 0 }; return; }
     for (const p of this.pending) this.replay(p);

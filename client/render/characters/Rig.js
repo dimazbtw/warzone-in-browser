@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { V, C, Q, M4 } from './pool.js';
 
 /**
  * Rig — mapeia um esqueleto humanoide (Meshy/Higgsfield, Mixamo ou o humanoide
@@ -68,19 +69,19 @@ export class Rig {
    * com o meio (joelho/cotovelo) puxado para `pole`. Tudo em coordenadas de mundo.
    */
   twoBone(A, B, C, target, pole, lenAB, lenBC) {
-    const a = A.getWorldPosition(new THREE.Vector3());
-    const toT = new THREE.Vector3().subVectors(target, a);
+    const a = A.getWorldPosition(V());
+    const toT = V().subVectors(target, a);
     let d = toT.length(); if (d < 1e-4) return;
     const dir = toT.divideScalar(d);
     d = Math.min(d, (lenAB + lenBC) * 0.9995); d = Math.max(d, Math.abs(lenAB - lenBC) + 0.001);
     const cosA = (lenAB * lenAB + d * d - lenBC * lenBC) / (2 * lenAB * d), sinA = Math.sqrt(Math.max(0, 1 - cosA * cosA));
-    const pd = new THREE.Vector3().subVectors(pole, a); pd.addScaledVector(dir, -pd.dot(dir));
+    const pd = V().subVectors(pole, a); pd.addScaledVector(dir, -pd.dot(dir));
     if (pd.lengthSq() < 1e-8) pd.set(0, 1, 0).addScaledVector(dir, -dir.y);
     pd.normalize();
-    const bTarget = new THREE.Vector3().copy(a).addScaledVector(dir, cosA * lenAB).addScaledVector(pd, sinA * lenAB);
+    const bTarget = V().copy(a).addScaledVector(dir, cosA * lenAB).addScaledVector(pd, sinA * lenAB);
     this.aimBone(A, B, bTarget.sub(a).normalize());
-    const b = B.getWorldPosition(new THREE.Vector3());
-    const endTarget = new THREE.Vector3().copy(a).addScaledVector(dir, d);
+    const b = B.getWorldPosition(V());
+    const endTarget = V().copy(a).addScaledVector(dir, d);
     this.aimBone(B, C, endTarget.sub(b).normalize());
   }
 }

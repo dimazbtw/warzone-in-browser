@@ -7,6 +7,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mat, part } from './Models.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MapRenderer } from './MapRenderer.js';
+import { assets } from '../assets/AssetManager.js';
 
 const RARITY = { common: 0xbbbbbb, uncommon: 0x6fd16f, rare: 0x4fa8ff, epic: 0xb36bff, legendary: 0xffb13a };
 const LOOT_COLOR = { cash: 0x6fdc6f, plate: 0x6ec6ff, ammo: 0xd8c14a, heal: 0xff7070, lethal: 0x9aa05a, intel: 0xffb13a };
@@ -111,8 +112,21 @@ export class World {
     }
     // aeronave
     const plane = this.plane = new THREE.Group();
-    plane.add(part(new THREE.CylinderGeometry(1.4, 1.1, 16, 12), mat(0x6b6f5a, { metalness: 0.4 }), 0, 0, 0, Math.PI / 2));
-    plane.add(part(new THREE.BoxGeometry(22, 0.3, 3), mat(0x5b5f4a), 0, 0.2, 0), part(new THREE.BoxGeometry(7, 0.25, 1.8), mat(0x5b5f4a), 0, 0.6, 7), part(new THREE.BoxGeometry(0.25, 3, 2), mat(0x5b5f4a), 0, 1.8, 7));
+    const glb = assets.get('aircraft');
+    if (glb) {
+      // KC-10 enviado pelo usuário: normaliza para ~42 m, nariz em -Z (mesma convenção do jogo), centrado
+      const m = glb.scene.clone(true); m.updateMatrixWorld(true);
+      const bb = new THREE.Box3().setFromObject(m), sz = bb.getSize(new THREE.Vector3()), c = bb.getCenter(new THREE.Vector3()), k = 42 / Math.max(sz.x, sz.z);
+      const holder = new THREE.Group(); m.position.sub(c); holder.add(m); holder.scale.setScalar(k);
+      m.traverse(o => { if (o.isMesh) { o.castShadow = false; o.material = o.material.clone(); o.material.roughness = 0.6; o.material.metalness = 0.05; o.material.emissive?.set(0x3a3e45); } });
+      plane.add(holder);
+      // luzes de navegação piscando (ponta da asa esquerda vermelha, direita verde)
+      const nav = (color, x) => { const l = new THREE.Mesh(new THREE.SphereGeometry(0.35, 8, 6), new THREE.MeshBasicMaterial({ color })); l.position.set(x, 0, 2); plane.add(l); return l; };
+      this.navLights = [nav(0xff2020, -sz.x * k / 2 + 0.5), nav(0x20ff40, sz.x * k / 2 - 0.5)];
+    } else {
+      plane.add(part(new THREE.CylinderGeometry(1.4, 1.1, 16, 12), mat(0x6b6f5a, { metalness: 0.4 }), 0, 0, 0, Math.PI / 2));
+      plane.add(part(new THREE.BoxGeometry(22, 0.3, 3), mat(0x5b5f4a), 0, 0.2, 0), part(new THREE.BoxGeometry(7, 0.25, 1.8), mat(0x5b5f4a), 0, 0.6, 7), part(new THREE.BoxGeometry(0.25, 3, 2), mat(0x5b5f4a), 0, 1.8, 7));
+    }
     this.aircraft = payload.aircraft; this.dynamic.add(plane); plane.visible = !!payload.aircraft;
     // marcadores de contrato
     this.contractMarker = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 60, 24, 1, true), new THREE.MeshBasicMaterial({ color: 0xffb13a, transparent: true, opacity: 0.22, side: THREE.DoubleSide, depthWrite: false }));
@@ -178,7 +192,7 @@ export class World {
       this.zoneWall.material.uniforms.time.value = time;
       this.nextZone.scale.set(Math.max(0.1, z.to.r), 1, Math.max(0.1, z.to.r)); this.nextZone.position.x = z.to.x; this.nextZone.position.z = z.to.z;
       const a = snap.match.aircraft; this.plane.visible = !!a;
-      if (a) { const k = Math.min(1, a.t / a.duration); this.plane.position.set(a.start.x + (a.end.x - a.start.x) * k, a.altitude + 4, a.start.z + (a.end.z - a.start.z) * k); this.plane.rotation.y = Math.atan2(-(a.end.x - a.start.x), -(a.end.z - a.start.z)); }
+      if (a) { const k = Math.min(1, a.t / a.duration); this.plane.position.set(a.start.x + (a.end.x - a.start.x) * k, a.altitude + 4, a.start.z + (a.end.z - a.start.z) * k); this.plane.rotation.y = Math.atan2(-(a.end.x - a.start.x), -(a.end.z - a.start.z)); this.plane.rotation.z = Math.sin(time * 0.4) * 0.03; if (this.navLights) for (const l of this.navLights) l.visible = (time % 1.2) < 0.15; }
       const c = snap.you.contract, pt = c && (c.area ?? c.cache ?? c.lastSeen);
       this.contractMarker.visible = !!pt;
       if (pt) { const r = c.area?.r ?? (c.lastSeen ? 15 : 2); this.contractMarker.scale.set(r, 1, r); this.contractMarker.position.x = pt.x; this.contractMarker.position.z = pt.z; }

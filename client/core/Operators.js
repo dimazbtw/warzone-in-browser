@@ -1,10 +1,7 @@
-/** Operadores selecionáveis (retratos gerados no Higgsfield). `tint` colore o uniforme do modelo 3D. */
-const IMG = 'https://d8j0ntlcm91z4.cloudfront.net/user_3Jib0BzU3aLdeWOQjrliCwaWdFv/hf_20260924_';
+/** Operadores selecionáveis: modelos 3D enviados pelo usuário (assets/models) + retratos renderizados deles. */
 export const OPERATORS = [
-  { id: 'caveira', name: 'CAVEIRA', desc: 'Força-tarefa noturna', img: IMG + '172742_fcfe9b2a-ad86-4cbc-8633-a21d62693126.png', tint: 0x8c8c8c, swatch: '#9a9a9a' },
-  { id: 'duna',    name: 'DUNA',    desc: 'Especialista do deserto', img: IMG + '172741_fc82033c-57a6-465e-b84f-c4ddbf864b19.png', tint: 0xe0c89c, swatch: '#d8c29a' },
-  { id: 'mateiro', name: 'MATEIRO', desc: 'Veterano de mata fechada', img: IMG + '172741_1e19f3c4-8a62-4386-b105-5b0b7106dd7c.png', tint: 0xa9bb86, swatch: '#9fb07a' },
-  { id: 'noturno', name: 'NOTURNO', desc: 'Operações urbanas', img: IMG + '172742_67718c5b-9753-4537-ac4e-3dd3276d2cde.png', tint: 0x8a9ec4, swatch: '#7f93b8' },
+  { id: 'caveira', name: 'CAVEIRA', desc: 'Força-tarefa noturna', model: 'operator_1', img: 'assets/portraits/operator_1.png', tint: 0x8c8c8c, swatch: '#3a3d42' },
+  { id: 'duna',    name: 'DUNA',    desc: 'Especialista do deserto', model: 'operator_2', img: 'assets/portraits/operator_2.png', tint: 0xe0c89c, swatch: '#b8a27a' },
 ];
 export const operatorOf = i => OPERATORS[((i ?? 0) % OPERATORS.length + OPERATORS.length) % OPERATORS.length];
 

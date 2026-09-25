@@ -8,7 +8,9 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
  */
 const HF = 'https://d8j0ntlcm91z4.cloudfront.net/user_3Jib0BzU3aLdeWOQjrliCwaWdFv/hf_20260924_';
 export const ASSET_LIST = {
-  soldier: { local: 'assets/models/soldier.glb', remote: HF + '173841_bba10e5a-6c81-4ece-9d12-68651f0ad91a.glb', size: 8.2e6, label: 'Operador' },
+  operator_1: { local: 'assets/models/operator_1.glb', size: 3.6e5, label: 'Operador Caveira' },
+  operator_2: { local: 'assets/models/operator_2.glb', size: 3.9e5, label: 'Operador Duna' },
+  aircraft:   { local: 'assets/models/aircraft.glb', size: 3.1e5, label: 'Aeronave' },
   rifle:   { local: 'assets/models/rifle.glb',   remote: HF + '173843_824599f6-4ea8-4128-bc98-f0fbac851e22.glb', size: 10.6e6, label: 'Fuzil' },
 };
 
@@ -33,9 +35,10 @@ class Assets extends EventTarget {
     return this.promise;
   }
   async loadOne(key, a) {
-    for (const url of [a.local, a.remote]) {
+    const local = a.local && new URL('../../' + a.local, import.meta.url).href;   // relativo ao projeto, não à página
+    for (const url of [local, a.remote].filter(Boolean)) {
       try {
-        if (url === a.local) { const head = await fetch(url, { method: 'HEAD' }); if (!head.ok) continue; }
+        if (url === local) { const head = await fetch(url, { method: 'HEAD' }); if (!head.ok) continue; }
         const gltf = await this.loader.loadAsync(url, e => { this.loaded[key] = e.loaded; if (e.total) this.total[key] = e.total; this.dispatchEvent(new Event('progress')); });
         this.items[key] = gltf; this.dispatchEvent(new Event('progress'));
         return;

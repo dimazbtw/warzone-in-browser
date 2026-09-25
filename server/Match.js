@@ -84,7 +84,7 @@ export class Match {
       onStateChange: (pl, from, to, info) => { ctx.log.debug(`${pl.name}: ${from} → ${to}`, info); ctx.bus.emit('playerState', { playerId: pl.id, from, to, info }); },
     });
     p.party = party ? String(party).slice(0, 12).toUpperCase() : null;
-    p.operator = Number.isInteger(operator) && operator >= 0 && operator < 16 ? operator : isBot ? Math.floor(ctx.rng() * 4) : 0;
+    p.operator = Number.isInteger(operator) && operator >= 0 && operator < 16 ? operator : isBot ? Math.floor(ctx.rng() * 2) : 0;
     ctx.players.set(p.id, p); this.tokens.set(p.token, p.id);
     ctx.log.info(`${p.name}${isBot ? ' (bot)' : ''} entrou (${ctx.players.size})`);
     ctx.bus.emit('lobbyChanged', {});
@@ -217,7 +217,7 @@ export class Match {
         spectating: p.spectating, stats: p.stats, squad: p.squadId,
         zone: S.zone.distanceInfo(p.pos),
         contract: S.contracts.viewFor(p), radar: radar > 0,
-        vy: +p.vel.y.toFixed(3), grounded: p.grounded, slide: p.slide, mantle: p.mantle, climb: p.climb, stamBlock: +(p.staminaBlockUntil - ctx.now()).toFixed(2), slideCd: +(p.slideCooldownUntil - ctx.now()).toFixed(2), tac: p.tacActive, pj: p.prevJump, pc: p.prevCrouch, yaw: +p.yaw.toFixed(3), sprinting: p.sprinting,
+        vy: +p.vel.y.toFixed(3), grounded: p.grounded, slide: p.slide, mantle: p.mantle, climb: p.climb, stamBlock: +(p.staminaBlockUntil - (p.clock ?? 0)).toFixed(3), slideCd: +(p.slideCooldownUntil - (p.clock ?? 0)).toFixed(3), clk: p.clock ?? 0, tac: p.tacActive, pj: p.prevJump, pc: p.prevCrouch, yaw: +p.yaw.toFixed(3), sprinting: p.sprinting,
       },
       squad: p.squadId ? S.squad.statusFor(p) : [],
       others,

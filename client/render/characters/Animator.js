@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { V, C, Q, M4 } from './pool.js';
 
 /**
  * Animator — animação procedural por IK para qualquer humanoide mapeado no Rig.
@@ -12,7 +13,7 @@ import * as THREE from 'three';
  *   5. braços: IK de dois ossos até o punho e o guarda-mão da arma
  *   6. pernas: ciclo de passos com pés plantados (IK) e altura do chão por pé
  */
-const _v = () => new THREE.Vector3();
+const _v = () => V();
 const UP = new THREE.Vector3(0, 1, 0);
 const approach = (cur, target, rate, dt) => cur + (target - cur) * Math.min(1, rate * dt);
 
@@ -31,7 +32,7 @@ export class Animator {
     this.rig = rig; this.weapon = weaponHolder; this.phase = Math.random(); this.t = 0;
     this.k = { crouch: 0, prone: 0, air: 0, freefall: 0, chute: 0, downed: 0, slide: 0, mantle: 0, dead: 0, sprint: 0, tac: 0, ads: 0, low: 0, hide: 0, action: 0 };
     this.speed = 0; this.moveYaw = 0; this.kick = 0; this.legTwist = 0; this.deadDir = 1;
-    this.fwd = _v(); this.right = _v(); this.tmp = _v();
+    this.fwd = new THREE.Vector3(); this.right = new THREE.Vector3(); this.tmp = new THREE.Vector3();
   }
   fire() { this.kick = 1; }
 
@@ -87,7 +88,7 @@ export class Animator {
     const hipsY = s.y + hsum / (locoW + K.prone + K.downed + K.dead + K.freefall + K.chute + wSlide || 1);
     const hipsFwd = K.prone * -0.55 + K.downed * 0.2 + K.dead * this.deadDir * -0.6;
     const hipsPos = _v().set(s.x, hipsY, s.z).addScaledVector(F, hipsFwd).addScaledVector(R, Math.sin(this.phase * Math.PI * 2) * 0.025 * run * locoW);
-    b.hips.position.copy(b.hips.parent.worldToLocal(hipsPos.clone()));
+    b.hips.position.copy(b.hips.parent.worldToLocal(C(hipsPos)));
     rig.update();
     const lean = -(run * 0.14 + K.sprint * 0.12 + K.tac * 0.16 + K.crouch * 0.18) * locoW;
     const pitchBody = lean - K.prone * 1.5 + K.downed * 0.75 - K.freefall * 1.35 + K.slide * 0.45 + K.dead * this.deadDir * 1.5 - K.mantle * 0.35;
@@ -102,23 +103,25 @@ export class Animator {
       rig.rotateWorld(bone, UP, -this.legTwist * w * 1.1);
       rig.rotateWorld(bone, R, aimPitch * w * 0.75 + spineCounter * w + breathe);
     }
+    // arma embutida (auto-rig): o peito inteiro levanta o fuzil ao mirar/atirar e baixa ao correr
+    if (this.bakedArms) rig.rotateWorld(b.spine2, R, (0.2 * K.ads + 0.12 * this.kick + 0.06) * (1 - K.sprint) * (1 - K.hide) - 0.12 * K.sprint);
     if (b.neck) rig.rotateWorld(b.neck, R, aimPitch * 0.15 + K.prone * 0.5 + K.freefall * 0.55 - K.downed * 0.1);
     rig.rotateWorld(b.head, R, aimPitch * 0.12 + K.prone * 0.35 + K.freefall * 0.4);
 
     // ---------- arma ----------
     const kind = s.weapon && GRIPS[s.weapon] ? s.weapon : 'rifle', G = GRIPS[kind], pistol = kind === 'sidearm';
     const chest = b.spine2.getWorldPosition(_v()), head = b.head.getWorldPosition(_v());
-    const bodyUp = UP.clone().applyAxisAngle(R, pitchBody), bodyF = F.clone().applyAxisAngle(R, pitchBody);
+    const bodyUp = C(UP).applyAxisAngle(R, pitchBody), bodyF = C(F).applyAxisAngle(R, pitchBody);
     // direção da arma: mira (com pitch) → sprint (atravessada) → tático (para cima) → baixa (ações)
-    const aimDir = F.clone().multiplyScalar(Math.cos(aimPitch)).addScaledVector(UP, Math.sin(aimPitch));
-    const portDir = F.clone().multiplyScalar(0.55).addScaledVector(UP, -0.45).addScaledVector(R, -0.55).normalize();
-    const tacDir = F.clone().multiplyScalar(0.25).addScaledVector(UP, 0.92).addScaledVector(R, -0.15).normalize();
-    const lowDir = F.clone().multiplyScalar(0.55).addScaledVector(UP, -0.8).normalize();
-    const pronDir = bodyUp.clone().multiplyScalar(1).normalize();
-    const D = aimDir.clone().multiplyScalar(Math.max(0, 1 - K.sprint - K.tac - K.low) * (1 - K.prone)).addScaledVector(portDir, K.sprint).addScaledVector(tacDir, K.tac).addScaledVector(lowDir, K.low)
+    const aimDir = C(F).multiplyScalar(Math.cos(aimPitch)).addScaledVector(UP, Math.sin(aimPitch));
+    const portDir = C(F).multiplyScalar(0.55).addScaledVector(UP, -0.45).addScaledVector(R, -0.55).normalize();
+    const tacDir = C(F).multiplyScalar(0.25).addScaledVector(UP, 0.92).addScaledVector(R, -0.15).normalize();
+    const lowDir = C(F).multiplyScalar(0.55).addScaledVector(UP, -0.8).normalize();
+    const pronDir = C(bodyUp).multiplyScalar(1).normalize();
+    const D = C(aimDir).multiplyScalar(Math.max(0, 1 - K.sprint - K.tac - K.low) * (1 - K.prone)).addScaledVector(portDir, K.sprint).addScaledVector(tacDir, K.tac).addScaledVector(lowDir, K.low)
       .addScaledVector(F, K.prone * 0.9).addScaledVector(pronDir, K.prone * 0.1).normalize();
     // punho: à frente do ombro direito; ADS sobe para a linha do olho
-    const sock = chest.clone()
+    const sock = C(chest)
       .addScaledVector(R, (0.1 - K.ads * 0.07 + (pistol ? -0.06 : 0)) * (1 - K.prone))
       .addScaledVector(UP, (-0.1 + K.ads * 0.12 - K.low * 0.1 + K.tac * 0.05) * (1 - K.prone))
       .addScaledVector(aimDir, (G.shoulder - 0.2 + (pistol ? 0.08 : 0)) * (1 - K.sprint - K.tac) * (1 - K.prone))
@@ -126,38 +129,38 @@ export class Animator {
       .addScaledVector(D, -0.05 * this.kick);
     if (K.prone > 0.01) sock.y = approach(sock.y, s.y + 0.22, 1, K.prone);
     if (K.action > 0.01) { const w = Math.sin(this.t * 6) * 0.03 * K.action; sock.addScaledVector(UP, -0.05 * K.action + w); }
-    const wq = new THREE.Quaternion().setFromRotationMatrix(new THREE.Matrix4().lookAt(new THREE.Vector3(), D, UP));
+    const wq = Q().setFromRotationMatrix(M4.lookAt(V(), D, UP));
     // recarga: rola a arma de lado
-    if (K.action > 0.01) wq.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), 0.6 * K.action));
-    const gripLocal = new THREE.Vector3(...G.grip);
+    if (K.action > 0.01) wq.multiply(Q().setFromAxisAngle(V(0, 0, 1), 0.6 * K.action));
+    const gripLocal = V(...G.grip);
     this.weapon.quaternion.copy(wq);
-    this.weapon.position.copy(sock).sub(gripLocal.clone().applyQuaternion(wq));
-    this.weapon.visible = K.hide < 0.5 && !!s.weapon;
+    this.weapon.position.copy(sock).sub(C(gripLocal).applyQuaternion(wq));
+    this.weapon.visible = K.hide < 0.5 && !!s.weapon && !this.bakedArms;
     this.weapon.updateMatrixWorld(true);
-    const rightTarget = this.weapon.localToWorld(gripLocal.clone());
-    const leftTarget = this.weapon.localToWorld(new THREE.Vector3(...G.support));
+    const rightTarget = this.weapon.localToWorld(C(gripLocal));
+    const leftTarget = this.weapon.localToWorld(V(...G.support));
     // recarga: mão de apoio vai ao carregador e volta
-    if (K.action > 0.01) { const cyc = (Math.sin(this.t * 3.2) * 0.5 + 0.5) * K.action; leftTarget.lerp(chest.clone().addScaledVector(R, -0.05).addScaledVector(UP, -0.25).addScaledVector(F, 0.2), cyc * 0.7); }
-    if (K.low > 0.01) leftTarget.lerp(chest.clone().addScaledVector(F, 0.22).addScaledVector(UP, -0.05), K.low);
+    if (K.action > 0.01) { const cyc = (Math.sin(this.t * 3.2) * 0.5 + 0.5) * K.action; leftTarget.lerp(C(chest).addScaledVector(R, -0.05).addScaledVector(UP, -0.25).addScaledVector(F, 0.2), cyc * 0.7); }
+    if (K.low > 0.01) leftTarget.lerp(C(chest).addScaledVector(F, 0.22).addScaledVector(UP, -0.05), K.low);
     // ---------- braços ----------
     const armL = b.armL.getWorldPosition(_v()), armR = b.armR.getWorldPosition(_v());
     const hand = (side) => {
       const sgn = side === 'L' ? -1 : 1, sh = side === 'L' ? armL : armR;
-      let t = side === 'L' ? leftTarget.clone() : rightTarget.clone();
+      let t = side === 'L' ? C(leftTarget) : C(rightTarget);
       // modos sem arma: queda livre (abertos), paraquedas (segurando as alças), morto (soltos), mantle (na borda)
-      const spread = sh.clone().addScaledVector(R, sgn * 0.52).addScaledVector(bodyF, 0.18).addScaledVector(bodyUp, 0.05);
-      const risers = sh.clone().addScaledVector(UP, 0.42).addScaledVector(R, sgn * 0.1).addScaledVector(F, 0.06);
-      const limp = sh.clone().addScaledVector(R, sgn * 0.2).addScaledVector(bodyUp, -0.5);
-      const ledge = chest.clone().addScaledVector(F, 0.42).addScaledVector(UP, 0.32).addScaledVector(R, sgn * 0.22);
+      const spread = C(sh).addScaledVector(R, sgn * 0.52).addScaledVector(bodyF, 0.18).addScaledVector(bodyUp, 0.05);
+      const risers = C(sh).addScaledVector(UP, 0.42).addScaledVector(R, sgn * 0.1).addScaledVector(F, 0.06);
+      const limp = C(sh).addScaledVector(R, sgn * 0.2).addScaledVector(bodyUp, -0.5);
+      const ledge = C(chest).addScaledVector(F, 0.42).addScaledVector(UP, 0.32).addScaledVector(R, sgn * 0.22);
       const ground = _v().set(s.x, s.y + 0.05, s.z).addScaledVector(F, -0.25).addScaledVector(R, sgn * 0.28);
       t.lerp(spread, K.freefall).lerp(risers, K.chute).lerp(limp, K.dead).lerp(ledge, K.mantle * 0.9);
       if (side === 'L') t.lerp(ground, K.downed);
-      const pole = sh.clone().addScaledVector(R, sgn * 0.35).addScaledVector(bodyUp, -0.55).addScaledVector(bodyF, -0.2);
+      const pole = C(sh).addScaledVector(R, sgn * 0.35).addScaledVector(bodyUp, -0.55).addScaledVector(bodyF, -0.2);
       rig.twoBone(b['arm' + side], b['fore' + side], b['hand' + side], t, pole, rig.len.upper, rig.len.fore);
-      const fq = b['fore' + side].getWorldQuaternion(new THREE.Quaternion());
+      const fq = b['fore' + side].getWorldQuaternion(Q());
       rig.setWorldQuaternion(b['hand' + side], fq.multiply(rig.handRestRel[side]));
     };
-    hand('R'); hand('L');
+    if (!this.bakedArms) { hand('R'); hand('L'); }
 
     // ---------- pernas ----------
     const hipsW = b.hips.getWorldPosition(_v());
@@ -169,23 +172,23 @@ export class Animator {
       if (ph < 0.6) off = stride * (0.5 - ph / 0.6); else { const u = (ph - 0.6) / 0.4; off = stride * (-0.5 + u); up = Math.sin(u * Math.PI) * lift; }
       const moving = Math.min(1, this.speed / 1.2);
       const idleOff = K.crouch * (side === 'R' ? 0.22 : -0.12);
-      const loco = base.clone().addScaledVector(M, off * moving).addScaledVector(F, idleOff * (1 - moving));
+      const loco = C(base).addScaledVector(M, off * moving).addScaledVector(F, idleOff * (1 - moving));
       const gy = s.groundAt ? s.groundAt(loco.x, loco.z) : s.y;
       loco.y = Math.max(s.y - 0.35, Math.min(s.y + 0.4, gy)) + 0.1 + up * moving;
       // outros modos
       const prone = _v().set(s.x, s.y + 0.08, s.z).addScaledVector(F, -0.85 + Math.sin((this.phase + phaseOff) * Math.PI * 2) * 0.12 * moving).addScaledVector(R, sgn * 0.18);
-      const ff = hipsW.clone().addScaledVector(bodyUp, -0.78).addScaledVector(R, sgn * 0.26).addScaledVector(bodyF, 0.1);
-      const chute = hipsW.clone().addScaledVector(UP, -0.86).addScaledVector(F, 0.12 + Math.sin(this.t * 1.3 + sgn) * 0.05).addScaledVector(R, sgn * 0.12);
-      const air = hipsW.clone().addScaledVector(UP, -0.72).addScaledVector(R, sgn * 0.13).addScaledVector(F, side === 'R' ? 0.12 : -0.05);
+      const ff = C(hipsW).addScaledVector(bodyUp, -0.78).addScaledVector(R, sgn * 0.26).addScaledVector(bodyF, 0.1);
+      const chute = C(hipsW).addScaledVector(UP, -0.86).addScaledVector(F, 0.12 + Math.sin(this.t * 1.3 + sgn) * 0.05).addScaledVector(R, sgn * 0.12);
+      const air = C(hipsW).addScaledVector(UP, -0.72).addScaledVector(R, sgn * 0.13).addScaledVector(F, side === 'R' ? 0.12 : -0.05);
       const sit = _v().set(s.x, s.y + 0.08, s.z).addScaledVector(F, 0.62 + (side === 'R' ? 0.1 : 0)).addScaledVector(R, sgn * 0.2);
       const slide = _v().set(s.x, s.y + 0.1, s.z).addScaledVector(F, side === 'R' ? 0.8 : 0.1).addScaledVector(R, sgn * 0.14);
-      const mantle = hipsW.clone().addScaledVector(UP, -0.45).addScaledVector(F, 0.25).addScaledVector(R, sgn * 0.14);
-      const dead = hipsW.clone().addScaledVector(bodyUp, -0.85).addScaledVector(R, sgn * 0.16);
+      const mantle = C(hipsW).addScaledVector(UP, -0.45).addScaledVector(F, 0.25).addScaledVector(R, sgn * 0.14);
+      const dead = C(hipsW).addScaledVector(bodyUp, -0.85).addScaledVector(R, sgn * 0.16);
       const t = loco.lerp(prone, K.prone).lerp(ff, K.freefall).lerp(chute, K.chute).lerp(air, K.air * (1 - K.mantle)).lerp(sit, K.downed).lerp(slide, K.slide).lerp(mantle, K.mantle).lerp(dead, K.dead);
-      const pole = thigh.clone().addScaledVector(bodyF, 0.6).addScaledVector(R, sgn * 0.08).addScaledVector(UP, -K.prone * 0.5);
+      const pole = C(thigh).addScaledVector(bodyF, 0.6).addScaledVector(R, sgn * 0.08).addScaledVector(UP, -K.prone * 0.5);
       rig.twoBone(b['thigh' + side], b['shin' + side], b['foot' + side], t, pole, rig.len.thigh, rig.len.shin);
       // pé plano, virado para frente
-      const rq = root.getWorldQuaternion(new THREE.Quaternion());
+      const rq = root.getWorldQuaternion(Q());
       rig.setWorldQuaternion(b['foot' + side], rq.multiply(rig.footRestRel[side]));
     };
     foot('L', 0); foot('R', 0.5);

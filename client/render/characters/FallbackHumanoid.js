@@ -6,7 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
  * posições de repouso). Usado se o GLB não carregar — o Animator trata os dois
  * igual. Olha para +Z, como o modelo do Meshy.
  */
-const BONES = [
+export const BONES = [
   ['Hips', null, [0, 1.005, 0]],
   ['LeftUpLeg', 'Hips', [0.11, 0.91, 0]], ['LeftLeg', 'LeftUpLeg', [0.12, 0.53, 0.02]], ['LeftFoot', 'LeftLeg', [0.12, 0.12, -0.03]], ['LeftToeBase', 'LeftFoot', [0.12, 0.03, 0.12]],
   ['RightUpLeg', 'Hips', [-0.11, 0.91, 0]], ['RightLeg', 'RightUpLeg', [-0.12, 0.53, 0.02]], ['RightFoot', 'RightLeg', [-0.12, 0.12, -0.03]], ['RightToeBase', 'RightFoot', [-0.12, 0.03, 0.12]],
@@ -16,7 +16,8 @@ const BONES = [
   ['neck', 'Spine', [0, 1.52, 0.015]], ['Head', 'neck', [0, 1.6, 0.02]], ['head_end', 'Head', [0, 1.8, 0.05]],
 ];
 
-export function buildFallbackHumanoid(style) {
+/** Esqueleto padrão (24 ossos, humano de 1,8 m olhando para +Z). */
+export function makeSkeleton() {
   const bones = {}, list = [];
   for (const [name, parent, p] of BONES) {
     const b = new THREE.Bone(); b.name = name; bones[name] = b; list.push(b);
@@ -24,6 +25,11 @@ export function buildFallbackHumanoid(style) {
     b.position.set(p[0] - pw[0], p[1] - pw[1], p[2] - pw[2]);
     if (parent) bones[parent].add(b);
   }
+  return { bones, list };
+}
+
+export function buildFallbackHumanoid(style) {
+  const { bones, list } = makeSkeleton();
   const W = n => new THREE.Vector3(...BONES.find(x => x[0] === n)[2]);
   const idx = n => list.findIndex(b => b.name === n);
   const parts = { cloth: [], gear: [], skin: [], boot: [] };

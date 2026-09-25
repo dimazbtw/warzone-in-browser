@@ -155,7 +155,7 @@ table.results td, table.results th { padding: 4px 10px; border-bottom: 1px solid
 #weapon { position: absolute; bottom: 22px; right: 26px; text-align: right; }
 #weapon .inv { display: flex; gap: 14px; justify-content: flex-end; font-size: 14px; }
 #weapon .inv span { background: rgba(0,0,0,.35); padding: 1px 6px; }
-#weapon .mag { font-size: 46px; font-weight: 600; line-height: 1; } #weapon .res { font-size: 16px; opacity: .75; }
+#weapon .mag { font-size: 46px; font-weight: 600; line-height: 1; } #weapon .res { font-size: 16px; opacity: .75; margin-left: 6px; }
 #weapon .wn { font-size: 12px; letter-spacing: 2px; opacity: .9; } #weapon .other { font-size: 11px; opacity: .55; }
 #weapon .rar { display: inline-block; width: 8px; height: 8px; margin-right: 6px; transform: rotate(45deg); }
 #actionBar { position: absolute; top: 58%; left: 50%; transform: translateX(-50%); width: 220px; text-align: center; font-size: 12px; letter-spacing: 2px; }
@@ -192,3 +192,26 @@ table.results td, table.results th { padding: 4px 10px; border-bottom: 1px solid
   .topbar { flex-wrap: wrap; padding: 10px 16px; } .panel-screen { padding: 16px; } .hero h1 { font-size: 44px; } .hero h1 span { font-size: 60px; }
   #compass { width: 320px; } #mmWrap { width: 160px; height: 160px; } #zoneInfo { top: 180px; width: 170px; }
 }
+
+/* ---------- HUD v2: mira, rastro de dano, munição, banner de abate ---------- */
+#crosshair i { transition: top .06s ease-out, left .06s ease-out; }
+#adsDot { position: absolute; left: 50%; top: 50%; width: 5px; height: 5px; margin: -2.5px; border-radius: 50%; background: #ff3030;
+  box-shadow: 0 0 6px 1px rgba(255,40,40,.8), 0 0 0 1px rgba(0,0,0,.4); opacity: 0; transform: scale(.4); transition: opacity .08s, transform .12s; }
+#adsDot.on { opacity: 1; transform: scale(1); }
+#hitmarker { transition: transform .08s; } #hitmarker[style*="opacity: 1"] { transform: scale(1.25) rotate(45deg); }
+.hp { position: relative; } .hp b { position: absolute; left: 0; top: 0; bottom: 0; background: #ff5a3a; opacity: .85; } .hp i { position: relative; }
+.hp.low i { background: #ff4040; animation: lowhp .7s ease-in-out infinite alternate; }
+@keyframes lowhp { from { opacity: 1; } to { opacity: .45; } }
+#weapon .mag { transition: transform .06s, color .2s; transform-origin: right bottom; } #weapon .mag.kick { transform: scale(1.06); } #weapon .mag.low { color: #ff5050; }
+#weapon .magbar { height: 3px; width: 150px; margin: 4px 0 4px auto; background: rgba(255,255,255,.12); transform: skewX(-20deg); }
+#weapon .magbar i { display: block; height: 100%; margin-left: auto; transition: width .08s; }
+#weapon .wn { padding-right: 6px; } #weapon .wn span { font-weight: 700; margin-right: 4px; }
+#weapon .warnAmmo { margin-top: 4px; font-size: 12px; font-weight: 800; letter-spacing: 2px; color: #ff5050; animation: lowhp .5s infinite alternate; }
+#killfeed div.new { animation: kfIn .25s ease-out; } #killfeed div.out { transition: opacity .4s; opacity: 0; }
+@keyframes kfIn { from { transform: translateX(40px); opacity: 0; } to { transform: none; opacity: 1; } }
+#killBanner { position: absolute; left: 50%; top: 64%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; opacity: 0; pointer-events: none;
+  background: linear-gradient(90deg, rgba(0,0,0,0), rgba(0,0,0,.65) 20%, rgba(0,0,0,.65) 80%, rgba(0,0,0,0)); padding: 8px 60px; }
+#killBanner i { font-style: normal; font-size: 30px; color: #ff3b3b; text-shadow: 0 0 12px rgba(255,40,40,.7); }
+#killBanner b { display: block; font-size: 18px; letter-spacing: 4px; color: #fff; } #killBanner span { font-size: 13px; color: var(--accent); letter-spacing: 1px; }
+#killBanner.show { animation: kb 2.2s ease-out forwards; }
+@keyframes kb { 0% { opacity: 0; transform: translateX(-50%) scale(1.4); } 8% { opacity: 1; transform: translateX(-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-10px); } }
