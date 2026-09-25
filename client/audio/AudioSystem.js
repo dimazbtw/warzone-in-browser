@@ -6,7 +6,7 @@ import { classOf } from '../render/Models.js';
 export class AudioSystem {
   constructor() { this.ctx = null; this.master = null; this.volume = Number(localStorage.getItem('zr_vol') ?? 0.6); this.wind = null; }
   unlock() {
-    if (this.ctx) { this.ctx.resume(); if (this.wantMusic && !this.musicTimer) this.menuMusic(true); return; }
+    if (this.ctx) { this.ctx.resume(); if (this.wantMusic) this.menuMusic(true); return; }
     const C = window.AudioContext || window.webkitAudioContext; if (!C) return;
     this.ctx = new C(); this.master = this.ctx.createGain(); this.master.gain.value = this.volume * (this.sfx ?? 1); this.master.connect(this.ctx.destination);
     this.buildReverb();
@@ -22,31 +22,23 @@ export class AudioSystem {
   setVolumes(master, sfx, music) {
     this.volume = master; this.sfx = sfx; this.musicVol = music;
     if (this.master) this.master.gain.value = master * sfx;
-    if (this.musicGain) this.musicGain.gain.value = master * music * 0.5;
+    if (this.music && this.wantMusic) this.music.volume = Math.max(0, Math.min(1, master * music * 1.4));
   }
-  /** Música ambiente generativa do menu (acordes lentos sintetizados). */
+  /** Música do menu: faixa enviada pelo usuário (assets/audio/menu.mp3), em loop, com fade. */
   menuMusic(on) {
     this.wantMusic = on;
-    if (!this.ctx) return;
-    if (on && !this.musicTimer) {
-      const c = this.ctx; this.musicGain = c.createGain(); this.musicGain.gain.value = (this.volume ?? 0.8) * (this.musicVol ?? 0.35) * 0.5; this.musicGain.connect(c.destination);
-      const chords = [[110, 164.8, 220, 261.6], [98, 146.8, 196, 246.9], [87.3, 130.8, 174.6, 220], [103.8, 155.6, 207.7, 261.6]];
-      let i = 0;
-      const play = () => {
-        const t = c.currentTime;
-        for (const f of chords[i++ % chords.length]) {
-          const o = c.createOscillator(), g = c.createGain(), lp = c.createBiquadFilter();
-          o.type = 'sawtooth'; o.frequency.value = f; o.detune.value = (Math.random() - 0.5) * 12;
-          lp.type = 'lowpass'; lp.frequency.value = 600;
-          g.gain.setValueAtTime(0, t); g.gain.linearRampToValueAtTime(0.05, t + 2); g.gain.linearRampToValueAtTime(0, t + 7.8);
-          o.connect(lp).connect(g).connect(this.musicGain); o.start(t); o.stop(t + 8);
-        }
-      };
-      play(); this.musicTimer = setInterval(play, 7000);
-    } else if (!on && this.musicTimer) {
-      clearInterval(this.musicTimer); this.musicTimer = null;
-      const g = this.musicGain; g.gain.setTargetAtTime(0, this.ctx.currentTime, 0.4); setTimeout(() => g.disconnect(), 2500);
+    if (!this.music) {
+      this.music = new Audio(new URL('../../assets/audio/menu.mp3', import.meta.url).href);
+      this.music.loop = true; this.music.preload = 'auto'; this.music.volume = 0;
     }
+    const target = () => Math.max(0, Math.min(1, (this.volume ?? 0.6) * (this.musicVol ?? 0.35) * 1.4));
+    clearInterval(this.musicFade);
+    if (on) this.music.play().catch(() => { /* sem interação ainda: toca no primeiro clique */ });
+    this.musicFade = setInterval(() => {
+      const t = on ? target() : 0, v = this.music.volume + Math.sign(t - this.music.volume) * 0.03;
+      this.music.volume = Math.abs(t - this.music.volume) < 0.035 ? t : Math.max(0, Math.min(1, v));
+      if (this.music.volume === t) { clearInterval(this.musicFade); if (!on) this.music.pause(); }
+    }, 60);
   }
   listener(pos, yaw) {
     this.lp = { x: pos.x, z: pos.z };

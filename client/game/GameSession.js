@@ -1,6 +1,9 @@
 import * as THREE from 'three';
 import { C2S } from '../../shared/protocol.js';
 import { MapGeometry } from '../../shared/geometry.js';
+import { weaponWeight } from '../../shared/movement.js';
+import { KEYMAP, keyName } from './InputSystem.js';
+const keyHint = action => { const k = [].concat(KEYMAP[action] ?? [])[0]; return k ? `<kbd>${keyName(k)}</kbd>` : ''; };
 import { Prediction } from './Prediction.js';
 import { Interpolation } from './Interpolation.js';
 import { Avatars } from '../render/Avatars.js';
@@ -166,7 +169,7 @@ export class GameSession {
       case 'pickupFailed': if (e.playerId === me && e.reason !== 'gone') h.notify({ full: 'Inventário cheio', range: 'Muito longe', state: 'Agora não' }[e.reason] ?? e.reason, 1.5); break;
       case 'purchase': h.notify(e.playerId === me ? `COMPRADO: ${e.name}` : `${this.nameOf(e.playerId)} comprou ${e.name}`, 2.5); a.cash(); if (e.playerId === me) this.renderShop(); break;
       case 'purchaseFailed': if (e.playerId === me) { h.notify(`Compra: ${e.reason}`, 2); a.warn(); } break;
-      case 'contractStarted': h.announce(`CONTRATO: ${e.contract.name.toUpperCase()}`, 3); a.ui(); break;
+      case 'contractStarted': h.banner(`CONTRATO ACEITO · ${e.contract.name.toUpperCase()}`, { hunt: '⌖', scavenger: '⚲', capture: '⚑', survive: '⛨', intel: '✉' }[e.contract.type] ?? '◆'); a.ui(); break;
       case 'contractUpdate': a.ui(); break;
       case 'contractCompleted': this.mstats.contracts++; h.announce(`CONTRATO CONCLUÍDO · +$${e.reward.cash} · +${e.reward.xp} XP`, 3.5); a.cash(); break;
       case 'contractFailed': if (!e.start || e.playerId === me) h.notify(`Contrato: ${e.reason}`, 2.5); break;
@@ -201,7 +204,11 @@ export class GameSession {
       case 'heal': n.send(C2S.USE_HEAL); break;
       case 'lethal': n.send(C2S.THROW, { yaw: i.yaw, pitch: i.pitch }); break;
       case 'tactical': n.send(C2S.TACTICAL, { yaw: i.yaw, pitch: i.pitch }); break;
-      case 'melee': n.send(C2S.MELEE, { yaw: i.yaw }); this.vm.melee(); this.audio.whoosh(); break;
+      case 'knife': n.send(C2S.SWITCH, { slot: 'knife' }); break;
+      case 'melee':   // V: equipa a faca; com a faca na mão, golpeia
+        if (this.snap.you.inv?.active !== 'knife') n.send(C2S.SWITCH, { slot: 'knife' });
+        else { n.send(C2S.MELEE, { yaw: i.yaw }); this.vm.melee(); this.audio.whoosh(); }
+        break;
       case 'ping': this.sendPing(); break;
       case 'interact': { const c = this.nearestChest(), it = this.nearestLoot(); if (c && (!it || c.d < it.d)) n.send(C2S.CHEST, { chestId: c.id }); else if (it) n.send(C2S.PICKUP, { lootId: it.id }); break; }
       case 'contract': { const b = this.nearBoard(); if (b) n.send(C2S.CONTRACT, { boardId: b.id }); else this.hud.notify('Nenhum tablet de contrato por perto', 1.5); break; }
@@ -234,6 +241,10 @@ export class GameSession {
 
   tryFire(click) {
     const y = this.snap?.you; if (!y || y.s !== 'alive' || !y.inv || this.shopOpen || !this.input.enabled) return;
+    if (y.inv.active === 'knife') {   // faca na mão: clique = golpe (o servidor valida a recarga do golpe)
+      const now = performance.now() / 1000; if (!click || now < (this.knifeAt ?? 0)) return;
+      this.knifeAt = now + (this.cfg.equipment?.melee?.cooldown ?? 0.8); this.net.send(C2S.MELEE, { yaw: this.input.yaw }); this.vm.melee(); this.audio.whoosh(); return;
+    }
     const w = y.inv[y.inv.active]; if (!w) return;
     const def = this.cfg.weapons[w.id], now = performance.now() / 1000;
     if (!click && !def.auto) return;
@@ -264,7 +275,8 @@ export class GameSession {
       if (this.shopOpen || !input.enabled) Object.assign(inp, { mx: 0, mz: 0, jump: false, sprint: false });
       this.net.send(C2S.INPUT, inp);
       const b0 = this.pred.body, wasG = b0.grounded, vy = b0.vel.y;
-      this.pred.step(inp, STEP, serverNow, ACTION_OPTS[y.action?.type] ?? {});
+      const actIv = y.inv, knifeOn = actIv?.active === 'knife';
+      this.pred.step(inp, STEP, serverNow, { ...(ACTION_OPTS[y.action?.type] ?? {}), weight: weaponWeight(this.cfg, actIv?.[actIv.active]?.id, knifeOn) });
       if (!wasG && b0.grounded && vy < -3 && y.s === 'alive') this.onLand(-vy);
     }
     if (!input.fire) this.recoilShots = Math.max(0, (this.recoilShots ?? 0) - dt * 12);
@@ -329,7 +341,7 @@ export class GameSession {
       if (show) this.self.animator.update(dt, { x: pos.x, y: pos.y, z: pos.z, yaw: input.yaw, pitch: 0, vx: body.vel.x, vz: body.vel.z, state: st, stance: 'stand', grounded: false, weapon: null });
     }
 
-    this.vm.setWeapon(st === 'alive' ? w?.id ?? null : null);
+    this.vm.setWeapon(st === 'alive' ? (inv?.active === 'knife' ? 'knife' : w?.id ?? null) : null);
     this.vm.update(dt, { ads: aim, sprint: body.sprinting, moving: Math.hypot(body.vel.x, body.vel.z) > 1 && body.grounded, speed: Math.hypot(body.vel.x, body.vel.z), slide: !!body.slide, grounded: body.grounded,
       action: y.action?.type, actionTime: y.action?.total, mouseDX: input.lastDX ?? 0, mouseDY: input.lastDY ?? 0, visible: st === 'alive', sniperScope: sniper });
     input.lastDX = input.lastDY = 0;
@@ -402,9 +414,15 @@ export class GameSession {
     const p = this.pred.body.pos;
     const ally = this.snap.others.find(o => o.a && o.s === 'downed' && Math.hypot(o.x - p.x, o.z - p.z) <= this.cfg.downed.reviveRange);
     if (ally) return `<b>[Segure E]</b> Reviver ${ally.n}`;
-    const ch = this.nearestChest(); if (ch && this.snap.you.action?.type !== 'chest') return '<b>[E]</b> Abrir baú de suprimentos';
+    const ch = this.nearestChest(); if (ch) return `${keyHint('interact')} Abrir baú de suprimentos`;
     const it = this.nearestLoot();
-    if (it) return `<b>[E]</b> ${it.type === 'weapon' ? `${this.cfg.weapons[it.data.id]?.name} <span style="color:${RAR_COLOR[it.rarity]}">(${it.rarity})</span>` : this.pickupText(it.type, it.data)}`;
+    if (it?.type === 'weapon') {   // card da arma no chão: silhueta, nome, família, raridade e as teclas
+      const d = this.cfg.weapons[it.data.id], R = this.cfg.rarity?.[it.rarity], CLS = { pistol: 'Pistola', smg: 'Submetralhadora', ar: 'Fuzil de assalto', shotgun: 'Escopeta', dmr: 'Fuzil de precisão', sniper: 'Sniper' };
+      const held = this.snap.you.inv?.[this.snap.you.inv.active];
+      return `<div class="lc-keys"><span>${keyHint('interact')} ${held && this.snap.you.inv.primary && this.snap.you.inv.secondary ? 'TROCAR' : 'EQUIPAR'}</span><span>${keyHint('ping')} MARCAR</span></div>
+        <div class="lootcard" style="--rc:${RAR_COLOR[it.rarity]}"><img src="assets/ui/w_${it.data.id}.png" alt=""><div><b>${d?.name}</b><small>${CLS[d?.class] ?? ''}</small><em>${R?.label ?? it.rarity}</em></div></div>`;
+    }
+    if (it) return `${keyHint('interact')} ${this.pickupText(it.type, it.data)}`;
     const b = this.nearBoard(); if (b) return `<b>[F]</b> Aceitar contrato: ${b.name}`;
     if (this.nearStation()) return '<b>[B]</b> Estação de compra';
     return null;

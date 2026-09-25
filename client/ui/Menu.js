@@ -41,14 +41,29 @@ export function renderSettings(box) {
   };
 }
 
+/** Controles remapeáveis: clique numa tecla, aperte a nova (Esc cancela). Conflito = troca as duas. */
 export function renderControls(box) {
-  box.innerHTML = Object.entries(KEY_LABELS).map(([action, label]) =>
-    `<div class="ctl"><span>${label}</span><span>${[].concat(KEYMAP[action] ?? action).map(k => `<kbd>${keyName(k)}</kbd>`).join(' ')}</span></div>`).join('')
+  const custom = { ...(settings.get('keys') ?? {}) };
+  box.innerHTML = `<div class="ctl-top"><span class="muted">Clique numa tecla e aperte a nova · Esc cancela</span><button class="ghost small" data-reset="1">RESTAURAR PADRÃO</button></div>`
+    + Object.entries(KEY_LABELS).map(([action, label]) => `<div class="ctl"><span>${label}</span><button class="keybtn" data-act="${action}">${keyName([].concat(KEYMAP[action])[0])}</button></div>`).join('')
     + `<div class="ctl"><span>Atirar / Mirar</span><span><kbd>Clique</kbd> <kbd>Botão direito</kbd></span></div>`
     + `<div class="ctl"><span>Trocar arma</span><span><kbd>Roda do mouse</kbd></span></div>`
-    + `<div class="ctl"><span>Sprint tático</span><span><kbd>Shift</kbd> duas vezes</span></div>`
-    + `<div class="ctl"><span>Slide</span><span><kbd>C</kbd> correndo</span></div>`
-    + `<div class="ctl"><span>Mantle / vault / escalar</span><span><kbd>Espaço</kbd> perto do obstáculo</span></div>`;
+    + `<div class="ctl"><span>Sprint tático</span><span>correr duas vezes</span></div>`;
+  box.onclick = e => {
+    if (e.target.closest('[data-reset]')) { settings.set('keys', {}); renderControls(box); return; }
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const act = b.dataset.act; b.textContent = '…'; b.classList.add('wait');
+    const onKey = ev => {
+      ev.preventDefault(); ev.stopPropagation(); removeEventListener('keydown', onKey, true);
+      if (ev.code !== 'Escape') {
+        const prev = [].concat(KEYMAP[act])[0], other = Object.keys(KEYMAP).find(a => a !== act && [].concat(KEYMAP[a])[0] === ev.code);
+        custom[act] = ev.code; if (other) custom[other] = prev;       // conflito: troca
+        settings.set('keys', custom);
+      }
+      renderControls(box);
+    };
+    addEventListener('keydown', onKey, true);
+  };
 }
 
 /**

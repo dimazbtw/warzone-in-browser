@@ -17,7 +17,6 @@ export class DamageSystem {
     // bots causam menos dano em humanos conforme a dificuldade (não vale para finalização/zona)
     if (attacker?.isBot && !victim.isBot && info.weapon !== 'melee') amount *= ctx.systems.bots?.preset?.damageVsHuman ?? 1;
     victim.lastDamageAt = now;
-    ctx.systems.inventory.cancelAction(victim, 'plate');
 
     // abatido: dano consome o "sangramento"; zerou = eliminado (finalizado)
     if (victim.is(PS.DOWNED)) {
@@ -26,7 +25,7 @@ export class DamageSystem {
       if (victim.bleed <= 0) ctx.systems.health.kill(victim, attacker, info.source === 'zone' ? 'zone' : 'finished');
       return amount;
     }
-    const toHealth = info.source === 'zone' ? amount : ctx.systems.armor.absorb(victim, amount);
+    const toHealth = info.source === 'zone' || info.source === 'fall' ? amount : ctx.systems.armor.absorb(victim, amount);
     victim.hp -= toHealth;
     this.report(attacker, victim, amount, info, victim.armor <= 0 && toHealth > 0);
     if (victim.hp <= 0) ctx.systems.health.onLethal(victim, attacker, info);

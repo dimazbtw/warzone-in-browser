@@ -112,10 +112,11 @@ export class LootSystem {
   requestChest(p, chestId) {
     const c = this.chests.get(String(chestId));
     const fail = reason => this.ctx.bus.emit('chestFailed', { playerId: p.id, chestId, reason });
-    if (!p.is(PS.ALIVE) || p.action) return fail('state');
+    if (!p.is(PS.ALIVE) || (p.action && p.action.type !== 'plate')) return fail('state');
     if (!c || c.opened) return fail('opened');
     if (!this.near(p, c, this.ctx.cfg.loot.chestRange ?? 2.4)) return fail('range');
-    this.ctx.systems.inventory.startAction(p, 'chest', this.ctx.cfg.loot.chestTime ?? 0.7, { chestId: c.id, slow: 0, blocksFire: true, blocksAds: true });
+    this.ctx.systems.inventory.cancelPlates(p);
+    this.openChest(p, c.id);   // abre na hora (a animação da tampa é só visual no cliente)
   }
   openChest(p, chestId) {
     const c = this.chests.get(chestId); if (!c || c.opened) return;

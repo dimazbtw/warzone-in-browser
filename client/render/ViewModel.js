@@ -51,6 +51,17 @@ const ARM_POSE = {
 };
 
 const VM_FOV = 50;
+/** Faca de combate (procedural): lâmina em -Z, cabo na origem. */
+function knifeModel() {
+  const g = new THREE.Group();
+  const steel = new THREE.MeshStandardMaterial({ color: 0xb9bec4, metalness: 0.9, roughness: 0.28 }), grip = new THREE.MeshStandardMaterial({ color: 0x1b1c1e, roughness: 0.8 });
+  const blade = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.032, 0.17), steel); blade.position.set(0, 0.004, -0.1);
+  const tip = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.05, 4), steel); tip.rotation.x = -Math.PI / 2; tip.scale.set(0.3, 1, 1); tip.position.set(0, 0.004, -0.205);
+  const guard = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.05, 0.01), grip); guard.position.z = -0.012;
+  const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.016, 0.11, 10), grip); handle.rotation.x = Math.PI / 2; handle.position.z = 0.045;
+  g.add(blade, tip, guard, handle); g.userData = { L: 0.3, muzzleZ: -0.23, knife: true };
+  return g;
+}
 const spring = (s, target, k, d, dt) => { const a = (target - s.x) * k - s.v * d; s.v += a * dt; s.x += s.v * dt; return s.x; };
 const smooth = t => t * t * (3 - 2 * t);
 
@@ -76,7 +87,8 @@ export class ViewModel {
     this.weaponId = id; this.style = style; this.root.clear(); this.gun = null;
     if (!id) return;
     const pistolCls = classOf(id) === 'pistol', real = realArms(pistolCls ? ARM_POSE.pistol : ARM_POSE.long);
-    const gun = realGun(id) || gunModel(id), arms = real || armsModel(style);
+    const gun = id === 'knife' ? knifeModel() : realGun(id) || gunModel(id), arms = real || armsModel(style);
+    if (id === 'knife' && arms.userData.left) arms.userData.left.visible = false;   // faca: só a mão direita
     const left = arms.userData.left;
     const pistol = pistolCls;
     if (!real) left.position.z = pistol ? -0.02 : -Math.min(0.42, gun.userData.L * 0.5);

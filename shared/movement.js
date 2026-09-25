@@ -36,6 +36,13 @@ export function wishDir(yaw, input) {
 }
 
 /** Passo em solo (inclui slide, mantle/vault, escalada, stamina). */
+/** Multiplicador de velocidade pela arma na mão (família do config). */
+export function weaponWeight(cfg, weaponId, knife = false) {
+  const W = cfg.movement.weaponWeight; if (!W) return 1;
+  if (knife) return W.knife ?? 1;
+  return W[cfg.weapons[weaponId]?.class] ?? 1;
+}
+
 export function stepGround(b, input, dt, now, cfg, geo, opts = {}) {
   // relógio do próprio corpo: avança com o dt de cada input, igual no cliente e no servidor
   // (usar o relógio de parede fazia cooldowns de slide/stamina divergirem → correções)
@@ -117,6 +124,7 @@ export function stepGround(b, input, dt, now, cfg, geo, opts = {}) {
     b.sprinting = sprint || tac;
     let speed = tac ? m.tacticalSprint : sprint ? m.sprint : b.stance === 'prone' ? m.prone : b.stance === 'crouch' ? m.crouch : b.ads ? m.ads : m.walk;
     if (opts.slow !== undefined) speed *= opts.slow;
+    if (opts.weight !== undefined) speed *= opts.weight;
     const w = wishDir(b.yaw, input), accel = b.grounded ? 14 : 3;
     b.vel.x += (w.x * speed * (moving ? 1 : 0) - b.vel.x) * Math.min(1, accel * dt);
     b.vel.z += (w.z * speed * (moving ? 1 : 0) - b.vel.z) * Math.min(1, accel * dt);
@@ -124,11 +132,12 @@ export function stepGround(b, input, dt, now, cfg, geo, opts = {}) {
   if (jumpPressed && b.grounded && b.stance !== 'prone') { b.vel.y = m.jumpVelocity; b.grounded = false; if (b.stance === 'crouch') b.stance = 'stand'; }
 
   // ---------- integração ----------
-  b.vel.y -= m.gravity * dt;
+  b.vel.y -= m.gravity * (b.vel.y < 0 ? m.fallGravity ?? 1 : 1) * dt;
+  b.vel.y = Math.max(-(m.terminalVelocity ?? 60), b.vel.y);
   b.pos.x += b.vel.x * dt; b.pos.z += b.vel.z * dt; b.pos.y += b.vel.y * dt;
   geo.resolve(b);
   const g = geo.groundHeight(b.pos.x, b.pos.z, b.pos.y - b.vel.y * dt, FOOT_R);
-  if (b.pos.y <= g) { if (!b.grounded && b.vel.y < -2) ev.landed = true; b.pos.y = g; b.vel.y = 0; b.grounded = true; }
+  if (b.pos.y <= g) { if (!b.grounded && b.vel.y < -2) { ev.landed = true; ev.impact = -b.vel.y; } b.pos.y = g; b.vel.y = 0; b.grounded = true; }
   else if (b.pos.y > g + 0.05) b.grounded = false;
   clampToMap(b, cfg);
   return ev;
@@ -150,7 +159,7 @@ export function stepAir(b, input, dt, fall, horiz, cfg, geo) {
   b.pos.x += b.vel.x * dt; b.pos.z += b.vel.z * dt; b.pos.y += b.vel.y * dt;
   clampToMap(b, cfg);
   const g = geo.groundHeight(b.pos.x, b.pos.z, b.pos.y - b.vel.y * dt);
-  if (b.pos.y <= g) { b.pos.y = g; b.vel.y = 0; b.grounded = true; return { landed: true }; }
+  if (b.pos.y <= g) { const impact = -b.vel.y; b.pos.y = g; b.vel.y = 0; b.grounded = true; return { landed: true, impact }; }
   return {};
 }
 

@@ -1,6 +1,6 @@
 import { PS } from '../Player.js';
 import { clamp } from '../core/math.js';
-import { stepGround, stepAir, stepCrawl } from '../../shared/movement.js';
+import { stepGround, stepAir, stepCrawl, weaponWeight } from '../../shared/movement.js';
 
 /**
  * MovementSystem (autoritativo)
@@ -66,13 +66,34 @@ export class MovementSystem {
       case PS.AIRCRAFT: p.yaw = input.yaw; break;
       case PS.FREEFALL:
         ev = stepAir(p, input, dt, m.freefallSpeed, m.freefallHorizontal, ctx.cfg, geo);
-        if (!ev.landed && ((input.jump && now - p.sm.enteredAt > 0.5) || p.pos.y - geo.groundHeight(p.pos.x, p.pos.z, p.pos.y) <= m.autoChuteHeight)) p.setState(PS.PARACHUTE, now);
+        if (!ev.landed && ((input.jump && !p.airJumpPrev && now - p.sm.enteredAt > 0.3) || (!p.chuteCut && p.pos.y - geo.groundHeight(p.pos.x, p.pos.z, p.pos.y) <= m.autoChuteHeight))) p.setState(PS.PARACHUTE, now);
         break;
-      case PS.PARACHUTE: ev = stepAir(p, input, dt, m.parachuteSpeed, m.parachuteHorizontal, ctx.cfg, geo); break;
-      case PS.ALIVE: ev = stepGround(p, input, dt, now, ctx.cfg, geo, { slow: p.action?.slow, blocksAds: p.action?.blocksAds }); break;
+      case PS.PARACHUTE: {
+        ev = stepAir(p, input, dt, m.parachuteSpeed, m.parachuteHorizontal, ctx.cfg, geo);
+        // C corta o paraquedas (volta à queda livre; Espaço abre de novo)
+        if (!ev.landed && input.crouch && !p.cutPrev) { p.chuteCut = true; p.setState(PS.FREEFALL, now); p.vel.y = Math.min(p.vel.y, -8); }
+        break;
+      }
+      case PS.ALIVE: {
+        const w = ctx.systems.inventory.active(p);
+        ev = stepGround(p, input, dt, now, ctx.cfg, geo, { slow: p.action?.slow, blocksAds: p.action?.blocksAds, weight: weaponWeight(ctx.cfg, w?.id, p.inv?.active === 'knife') });
+        // saltou de um lugar alto: Espaço no ar abre o paraquedas
+        const jumpEdge = input.jump && !p.airJumpPrev;
+        if (!p.grounded && jumpEdge && p.vel.y < -2 && p.pos.y - geo.groundHeight(p.pos.x, p.pos.z, p.pos.y) > (m.chuteMinHeight ?? 7)) {
+          ctx.systems.inventory.cancelPlates(p); p.setState(PS.PARACHUTE, now); p.vel.y = Math.max(p.vel.y, -m.parachuteSpeed);
+        }
+        // dano de queda (ignora armadura)
+        if (ev.landed && ev.impact > (m.fallDamage?.safeSpeed ?? 99)) ctx.systems.damage.apply(null, p, (ev.impact - m.fallDamage.safeSpeed) * m.fallDamage.perMs, { part: 'torso', weapon: 'fall', source: 'fall' });
+        break;
+      }
       case PS.DOWNED: stepCrawl(p, input, dt, ctx.cfg.downed.moveSpeed, ctx.cfg, geo); break;
     }
-    if (ev.landed && p.is(PS.FREEFALL, PS.PARACHUTE)) { p.setState(PS.ALIVE, now); p.prevJump = true; }
+    if (ev.landed && p.is(PS.FREEFALL, PS.PARACHUTE)) {
+      // cortou o paraquedas e caiu de queda livre: dano de impacto
+      if (p.chuteCut && p.is(PS.FREEFALL) && ev.impact > (m.fallDamage?.safeSpeed ?? 99)) ctx.systems.damage.apply(null, p, (ev.impact - m.fallDamage.safeSpeed) * m.fallDamage.perMs, { part: 'torso', weapon: 'fall', source: 'fall' });
+      p.setState(PS.ALIVE, now); p.prevJump = true; p.chuteCut = false;
+    }
+    p.airJumpPrev = !!input.jump; p.cutPrev = !!input.crouch;
     for (const k of ['landed', 'slid', 'mantled', 'vaulted']) if (ev[k]) ctx.bus.emit(k, { playerId: p.id });
   }
 }

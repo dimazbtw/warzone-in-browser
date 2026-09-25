@@ -1,3 +1,4 @@
+import { KEYMAP, keyName } from '../game/InputSystem.js';
 /**
  * HUDSystem — toda a interface em DOM/canvas 2D, alimentada só por snapshots/eventos.
  * Vida, armadura, munição, arma, inventário, dinheiro, minimapa, aliados,
@@ -6,6 +7,8 @@
  */
 const $ = id => document.getElementById(id);
 const STATE = { alive: 'VIVO', downed: 'ABATIDO', awaiting: 'RETORNANDO', eliminated: 'ELIMINADO', freefall: 'QUEDA LIVRE', parachute: 'PARAQUEDAS', aircraft: 'AERONAVE' };
+/** Rótulo curto da tecla configurada para a ação (ex.: [Q]). */
+const keyHint = action => { const k = [].concat(KEYMAP[action] ?? [])[0]; return k ? `<kbd>${keyName(k)}</kbd>` : ''; };
 const RAR = { common: '#bbb', uncommon: '#6fd16f', rare: '#4fa8ff', epic: '#b36bff', legendary: '#ffb13a' };
 const PX_PER_DEG = 3.2;
 
@@ -57,6 +60,11 @@ export class HUDSystem {
       <div class="inv-slot"><small>DINHEIRO</small><b style="color:var(--green)">$${inv.cash}</b><small>☠ ${you.stats?.kills ?? 0} eliminações</small></div></div>
       <h3 style="margin-top:12px">ESQUADRÃO</h3>${squad.map(m => `<div class="inv-slot" style="margin-top:4px"><b>${m.name}</b> <small>${STATE[m.state] ?? m.state}</small></div>`).join('') || '<small>sozinho</small>'}`;
   }
+  /** Faixa grande no centro (contrato aceito etc.), com chevrons amarelos. */
+  banner(text, icon = '◆') {
+    const el = $('banner'); el.innerHTML = `<div class="bn-ic">${icon}</div><div class="bn-row"><i>❯</i><b>${text}</b><i>❮</i></div>`;
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+  }
   /** Tiro local: abre a cruz e dá um tranco no contador. */
   fired() { this.bloom = Math.min(18, (this.bloom ?? 0) + 5); this.magKick = performance.now() + 60; }
   /** Banner de eliminação no centro da tela. */
@@ -82,15 +90,17 @@ export class HUDSystem {
     const s = v.snap; if (!s) return;
     const y = s.you, now = performance.now();
     // topo
-    $('topright').innerHTML = `<span>👤 <b>${s.match.alive}</b></span><span>👥 <b>${s.match.squadsLeft}</b></span><span>☠ <b>${y.stats.kills}</b></span>`;
+    $('topright').innerHTML = `<div><i>⛨</i><b>${s.match.squadsLeft}</b></div><div><i>👤</i><b>${s.match.alive}</b></div><div><i>☠</i><b>${y.stats.kills}</b></div>`;
     const z = s.zone, zi = y.zone, mm = Math.floor(Math.max(0, z.t) / 60), ss = String(Math.ceil(Math.max(0, z.t)) % 60).padStart(2, '0');
     const bearing = ((zi.bearing * 180 / Math.PI) + 360) % 360;
-    $('zoneInfo').innerHTML = `<div>ZONA ${z.phase + 1}/${z.total} · ${z.state === 'waiting' ? 'fecha em' : z.state === 'closing' ? 'FECHANDO' : ''} <b>${mm}:${ss}</b> · ${z.dps} dano/s</div>
-      <div>${zi.outside > 0 ? `<b>FORA DA ZONA · ${Math.round(zi.outside)} m ➜ ${Math.round(bearing)}°</b>` : `<span class="ok">DENTRO DA ZONA</span> · borda a ${Math.round(-zi.outside)} m`}</div>
-      <div>RESSURGIMENTO <span class="${s.match.resurgence ? 'ok' : 'off'}">${s.match.resurgence ? 'ATIVO' : 'DESATIVADO'}</span>${y.radar ? ' · <span class="off">📡 RADAR</span>' : ''}</div>`;
+    $('zoneInfo').innerHTML = `<div class="zrow"><span class="zt"><em>${z.phase + 1}</em>${mm}:${ss}</span><span class="zt gas ${z.state === 'closing' ? 'on' : ''}"><em>☁</em>${z.state === 'closing' ? 'FECHANDO' : z.state === 'waiting' ? 'ESPERA' : 'FINAL'}</span><span class="zt"><em>♻</em><span class="${s.match.resurgence ? 'ok' : 'off'}">${s.match.resurgence ? 'ATIVO' : 'OFF'}</span></span></div>
+      ${zi.outside > 0 ? `<div class="zwarn">FORA DA ZONA · ${Math.round(zi.outside)} m ➜ ${Math.round(bearing)}° · ${z.dps}/s</div>` : ''}${y.radar ? '<div class="zwarn radar">📡 RADAR ATIVO</div>' : ''}`;
     // bússola
     const hd = ((-v.yaw * 180 / Math.PI) % 360 + 360) % 360;
     $('compassStrip').style.transform = `translateX(${260 - hd * PX_PER_DEG}px)`;
+    $('compassHead').textContent = Math.round(hd) % 360;
+    let poi = null, pd = 160; for (const p of v.mapView?.pois ?? []) { const d = Math.hypot(p.x - v.pos.x, p.z - v.pos.z); if (d < pd) { pd = d; poi = p; } }
+    $('poiName').textContent = poi ? poi.name.toUpperCase() : '';
     const place = (id, tx, tz) => { const el = $(id); if (tx === undefined) { el.style.display = 'none'; return; } el.style.display = '';
       let a = ((Math.atan2(tx - v.pos.x, -(tz - v.pos.z)) * 180 / Math.PI) + 360) % 360; if (a - hd > 180) a -= 360; if (hd - a > 180) a += 360; el.style.left = a * PX_PER_DEG + 'px'; };
     place('mkZone', z.to.x, z.to.z);
@@ -105,20 +115,31 @@ export class HUDSystem {
     if (now > this.hpHold) this.hpGhost = Math.max(y.hp, this.hpGhost - (now - (this.lastHud ?? now)) * 0.06);
     this.lastHp = y.hp; this.lastHud = now;
     const plates = [0, 1, 2].map(i => `<i style="--f:${Math.max(0, Math.min(1, (y.ar - i * cfgH.plates.hpPerPlate) / cfgH.plates.hpPerPlate)) * 100}%"></i>`).join('');
-    $('squad').innerHTML = s.squad.map(m => `<div class="sq"><span class="n st-${m.state}">${m.name}${m.connected ? '' : ' ⚠'}</span><span class="r st-${m.state}">${STATE[m.state] ?? m.state}${m.respawnIn != null ? ` ${m.respawnIn}s` : ''}${m.bleed != null ? ` ♥${m.bleed}` : ''} · ${m.dist} m</span>
-      ${['alive', 'freefall', 'parachute'].includes(m.state) ? `<div class="bars">${[0, 1, 2].map(i => `<i style="--f:${Math.max(0, Math.min(1, (m.armor - i * 50) / 50)) * 100}%"></i>`).join('')}</div><div class="hp"><i style="width:${m.hp}%"></i></div>` : ''}</div>`).join('')
-      + `<div class="sq me"><span class="n">${v.myName}</span><span class="r cash">$${inv?.cash ?? 0}</span>
-      <div class="bars">${plates}</div><div class="hp ${y.hp < 35 && y.s === 'alive' ? 'low' : ''}"><b style="width:${this.hpGhost}%"></b><i style="width:${Math.max(0, y.hp)}%"></i></div><div class="stam"><i style="width:${y.stam}%"></i></div></div>`;
-    // arma
+    const COLORS = ['#ff9a3c', '#58c7d8', '#6fd16f', '#e05cff'];
+    const seg = (a, i) => `<i style="--f:${Math.max(0, Math.min(1, (a - i * cfgH.plates.hpPerPlate) / cfgH.plates.hpPerPlate)) * 100}%"></i>`;
+    const member = (m, n, me) => {
+      const up = ['alive', 'freefall', 'parachute'].includes(m.state), st = !up ? `<span class="sq-st st-${m.state}">${STATE[m.state] ?? m.state}${m.respawnIn != null ? ` ${m.respawnIn}s` : ''}${m.bleed != null ? ` ♥${m.bleed}` : ''}</span>` : '';
+      return `<div class="sq2 ${me ? 'me' : ''}" style="--c:${COLORS[n - 1]}"><div class="sq-h"><em>${n}</em><b>${m.name}</b>${st}${!me && m.dist != null ? `<span class="sq-d">${m.dist}m</span>` : ''}</div>
+        ${up || me ? `<div class="bars">${[0, 1, 2].map(i => seg(me ? y.ar : m.armor, i)).join('')}</div><div class="hp ${me && y.hp < 35 && y.s === 'alive' ? 'low' : ''}">${me ? `<b style="width:${this.hpGhost}%"></b>` : ''}<i style="width:${Math.max(0, me ? y.hp : m.hp)}%"></i></div>` : ''}
+        ${me ? `<div class="stam"><i style="width:${y.stam}%"></i></div>` : ''}</div>`;
+    };
+    const sqHtml = `<div class="sq-cash"><i>$</i><b>$${inv?.cash ?? 0}</b></div>` + s.squad.map((m, k) => member(m, s.squad.length - k + 1, false)).join('') + member({ name: v.myName, state: y.s }, 1, true);
+    if (sqHtml !== this._sqHtml) { $('squad').innerHTML = sqHtml; this._sqHtml = sqHtml; }
+    // equipamentos (placas / cura / letal / tático) — ao lado do squad
+    if (inv) $('equip').innerHTML = `<div class="eq"><b>${inv.plates}</b><small>${keyHint('plate')}</small><span>PLACAS</span></div><div class="eq"><b>${inv.heals}</b><small>${keyHint('heal')}</small><span>CURA</span></div>`;
+    // arma: card com silhueta, nome, raridade, munição grande + reserva; letal/tático acima
     if (inv) {
-      const w = inv[inv.active], def = w && v.cfg.weapons[w.id], other = inv[inv.active === 'primary' ? 'secondary' : 'primary'];
+      const knife = inv.active === 'knife', w = knife ? null : inv[inv.active], def = w && v.cfg.weapons[w.id], other = inv[inv.active === 'primary' ? 'secondary' : 'primary'];
       const R = w && v.cfg.rarity?.[w.rarity], rc = RAR[w?.rarity] ?? '#bbb', res = def ? inv.ammo[def.ammo] : 0, max = def ? Math.round(def.mag * (R?.mag ?? 1)) : 1;
       const low = w && w.mag <= max * 0.25, empty = w && w.mag === 0 && res === 0;
-      $('weapon').innerHTML = `<div class="inv"><span>🛡 ${inv.plates}</span><span>✚ ${inv.heals}</span><span>💣 ${inv.lethal}</span><span>☁ ${inv.tactical ?? 0}</span></div>
-        <div class="mag ${low ? 'low' : ''} ${this.magKick > now ? 'kick' : ''}">${w?.mag ?? 0}<span class="res">/ ${res}</span></div>
-        <div class="magbar"><i style="width:${Math.min(100, (w?.mag ?? 0) / max * 100)}%;background:${low ? '#ff5050' : rc}"></i></div>
-        <div class="wn" style="border-right:3px solid ${rc}"><span style="color:${rc}">${R?.label ?? ''}</span> ${def?.name ?? '—'}</div><div class="other">${other ? v.cfg.weapons[other.id]?.name : '— slot vazio —'}</div>
-        ${empty ? '<div class="warnAmmo">SEM MUNIÇÃO</div>' : low && y.action?.type !== 'reload' ? '<div class="warnAmmo">[R] RECARREGUE</div>' : ''}`;
+      const wHtml = `<div class="gear"><div class="g"><i>💣</i><b>${inv.lethal}</b><small>${keyHint('lethal')}</small></div><div class="g"><i>☁</i><b>${inv.tactical ?? 0}</b><small>${keyHint('tactical')}</small></div></div>
+        <div class="wcard" style="--rc:${rc}"><div class="wc-name"><span style="color:${rc}">◆</span> ${knife ? 'FACA DE COMBATE' : def?.name ?? '—'}</div>
+          <div class="wc-body">${knife ? '<div class="wc-knife">🗡</div>' : w ? `<img src="assets/ui/w_${w.id}.png" alt="">` : ''}
+          ${knife ? '<div class="wc-ammo"><b>—</b></div>' : `<div class="wc-ammo"><b class="${low ? 'low' : ''} ${this.magKick > now ? 'kick' : ''}">${w?.mag ?? 0}</b><span>${res}</span></div>`}</div>
+          <div class="wc-foot"><span class="dots">${'•'.repeat(Math.min(5, Math.ceil((w?.mag ?? 0) / max * 5)))}</span><span class="mode">${def?.auto ? 'AUTO' : knife ? 'CORPO A CORPO' : 'SEMI'}</span><span class="rar" style="color:${rc}">${R?.label ?? ''}</span></div>
+          <div class="wc-other">${other ? `${keyHint(inv.active === 'primary' ? 'secondary' : 'primary')} ${v.cfg.weapons[other.id]?.name}` : ''} · ${keyHint('knife')} FACA</div></div>
+        ${empty ? '<div class="warnAmmo">SEM MUNIÇÃO</div>' : low && y.action?.type !== 'reload' ? `<div class="warnAmmo">${keyHint('reload')} RECARREGUE</div>` : ''}`;
+      if (wHtml !== this._wHtml) { $('weapon').innerHTML = wHtml; this._wHtml = wHtml; }   // só reescreve quando muda (a silhueta <img> precisa persistir)
     }
     // ponto vermelho do ADS e abertura da cruz ao atirar
     $('adsDot').classList.toggle('on', !!v.ads && !v.sniperScope);

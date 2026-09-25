@@ -106,8 +106,10 @@
 
 <!-- ======================= CARREGANDO ======================= -->
 <div id="loading" class="screen hidden">
+  <div class="load-bg"></div>
   <div class="load-box">
-    <div class="brand big">ZONA <b>RESSURGE</b></div>
+    <div class="lb-brand"><b>ZONA</b><span>RESSURGE</span><small>TEMPORADA 1</small></div>
+    <div class="load-mode"><div class="mode-ic">▲</div><div><b>BATTLE ROYALE</b><small>RESSURGIMENTO</small></div></div>
     <div id="loadStage">Preparando partida…</div>
     <div class="load-bar"><i id="loadBar"></i></div>
     <div id="loadTip" class="muted"></div>
@@ -124,13 +126,16 @@
   <div id="killBanner"></div>
   <div id="dmgDirs"></div>
   <div id="scope" class="hidden"></div>
-  <div id="compass"><div id="compassStrip"></div><i class="needle"></i></div>
+  <div id="compass"><div id="compassStrip"></div><div id="compassHead">0</div><div id="poiName"></div></div>
   <div id="mmWrap"><canvas id="minimap" width="220" height="220"></canvas><span class="north">N</span></div>
   <div id="zoneInfo"></div>
   <div id="topright"></div>
   <div id="killfeed"></div>
   <div id="contract" class="hidden"></div>
   <div id="squad"></div>
+  <div id="equip"></div>
+  <div id="banner"></div>
+  <div id="invHint"><kbd>TAB</kbd><span>INVENTÁRIO</span></div>
   <div id="weapon"></div>
   <div id="actionBar" class="hidden"><div></div><span></span></div>
   <div id="prompt"></div>
@@ -148,7 +153,8 @@
 
 <!-- ======================= PAUSA ======================= -->
 <div id="pause" class="screen hidden">
-  <div class="pause-box">
+  <div class="pause-box glass">
+    <div class="lb-brand small"><b>ZONA</b><span>RESSURGE</span></div>
     <h2 id="pauseTitle">PAUSADO</h2>
     <p id="pauseSub" class="muted"></p>
     <button class="cta" id="resumeBtn">CONTINUAR</button>
@@ -161,7 +167,8 @@
 
 <!-- ======================= FIM ======================= -->
 <div id="end" class="screen hidden">
-  <div class="end-box">
+  <div class="end-box glass">
+    <div class="lb-brand small"><b>ZONA</b><span>RESSURGE</span><small>FIM DE PARTIDA</small></div>
     <h1 id="endTitle"></h1>
     <div id="endStats"></div>
     <div id="endXp"></div>

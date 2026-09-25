@@ -1,0 +1,19 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:transparent}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script></head><body>
+<script type="module">
+// Ícones (silhueta clara, fundo transparente) das armas para o HUD: ?w=rifle
+import * as THREE from 'three';
+import { assets } from '../client/assets/AssetManager.js';
+import { characters } from '../client/render/characters/CharacterFactory.js';
+const id = new URLSearchParams(location.search).get('w'), W = 360, H = 140;
+const r = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true }); r.setSize(W, H); r.setClearColor(0, 0); document.body.appendChild(r.domElement);
+const s = new THREE.Scene(); await assets.wait(60000);
+const g = characters.gun(id); g.material = (Array.isArray(g.material) ? g.material : [g.material]).map(() => new THREE.MeshBasicMaterial({ color: 0xf2f4f6 }));
+g.geometry.computeBoundingBox(); const b = g.geometry.boundingBox, c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3());
+s.add(g); const cam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.01, 10);
+const halfW = sz.z / 2 * 1.06, halfH = Math.max(sz.y / 2 * 1.1, halfW * H / W);
+cam.left = -halfW * (W / H) * (halfH / halfW) ; cam.right = -cam.left; cam.top = halfH; cam.bottom = -halfH;
+const k = Math.max(halfW, halfH * W / H); cam.left = -k; cam.right = k; cam.top = k * H / W; cam.bottom = -k * H / W; cam.updateProjectionMatrix();
+cam.position.set(c.x + 3, c.y, c.z); cam.lookAt(c.x, c.y, c.z);   // vista lateral: cano para a direita
+r.render(s, cam); window.ready = true;
+</script></body></html>

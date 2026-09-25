@@ -323,3 +323,117 @@ table.results td, table.results th { padding: 4px 10px; border-bottom: 1px solid
 
 @media (max-width: 1400px) { .lb-challenges, .lb-mode, .lb-quest { width: 380px; } .team-cards { grid-template-columns: repeat(4, minmax(0, 170px)); } .team-card { height: 176px; } .lb-start { height: 170px; } }
 @media (max-width: 1100px) { .lb-quest, .op-tag { display: none; } .lb-bottom { flex-wrap: wrap; } .lb-tabs .nav { font-size: 15px; padding: 4px 9px; } .lb-brand { width: auto; } }
+
+/* ================================================================ HUD v3 (estilo da referência, mesma linguagem do lobby) */
+#hud { font-family: var(--lb-font); }
+#hud kbd { display: inline-block; min-width: 18px; padding: 0 4px; font: 700 12px var(--lb-font); line-height: 16px; text-align: center; color: #111; background: #e6ecf0; border-radius: 2px; margin-right: 4px; vertical-align: 1px; }
+/* minimapa quadrado + cronômetros */
+#mmWrap { top: 18px; left: 30px; width: 240px; height: 240px; border-radius: 0; border: 2px solid rgba(160,190,210,.35); box-shadow: 0 0 0 1px rgba(0,0,0,.6), 0 6px 18px rgba(0,0,0,.4); }
+#minimap { width: 100%; height: 100%; }
+#zoneInfo { top: 264px; left: 30px; width: 240px; font-size: 16px; }
+#zoneInfo div { background: none; padding: 0; margin: 0; }
+#zoneInfo .zrow { display: flex; gap: 2px; background: rgba(40,70,90,.72); padding: 5px 8px; }
+#zoneInfo .zt { flex: 1; display: flex; align-items: center; gap: 6px; font-weight: 700; letter-spacing: 1px; color: #e8f2f6; }
+#zoneInfo .zt em { font-style: normal; width: 20px; height: 20px; display: grid; place-items: center; border: 1px solid rgba(255,255,255,.7); border-radius: 50%; font-size: 12px; }
+#zoneInfo .zt.gas.on { color: #ffb070; } #zoneInfo .ok { color: var(--green); } #zoneInfo .off { color: var(--red); }
+#zoneInfo .zwarn { margin-top: 3px !important; background: rgba(120,30,20,.8) !important; padding: 4px 8px !important; font-size: 14px; font-weight: 700; color: #ffd0c0; letter-spacing: 1px; }
+#zoneInfo .zwarn.radar { background: rgba(120,30,90,.7) !important; }
+/* contrato (cartão amarelo, como a referência) */
+#contract { top: 302px; left: 30px; right: auto; width: 240px; background: linear-gradient(90deg, rgba(90,80,40,.85), rgba(40,40,30,.75)); border: 0; border-left: 34px solid #e8b13a; padding: 7px 10px; font-size: 14px; }
+#contract h4 { color: #fff; font-size: 16px; letter-spacing: 1px; } #contract .muted { opacity: .75; font-size: 13px; }
+/* bússola com rumo e local */
+#compass { top: 6px; width: 700px; height: 58px; overflow: visible; background: none; }
+#compass #compassStrip { height: 26px; overflow: visible; }
+#compassStrip span.c { font-size: 17px; font-family: var(--lb-font); } #compassStrip span { font-family: var(--lb-font); }
+#compassHead { position: absolute; left: 50%; top: 4px; transform: translateX(-50%); background: rgba(10,14,18,.85); border: 1px solid rgba(232,177,58,.8); color: var(--accent); font-weight: 700; font-size: 20px; padding: 0 8px; line-height: 24px; min-width: 50px; text-align: center; }
+#poiName { position: absolute; left: 50%; top: 32px; transform: translateX(-50%); color: var(--accent); font-weight: 700; font-size: 15px; letter-spacing: 2px; white-space: nowrap; text-shadow: 0 1px 3px #000; }
+#compass .needle { display: none; }
+/* contadores do topo direito */
+#topright { top: 14px; right: 30px; gap: 22px; }
+#topright div { display: flex; flex-direction: column; align-items: center; line-height: 1; text-shadow: 0 1px 3px #000; }
+#topright i { font-style: normal; font-size: 18px; opacity: .9; } #topright b { font-size: 17px; margin-top: 3px; }
+/* squad (números coloridos) */
+#squad { left: 30px; bottom: 26px; width: 250px; gap: 3px; }
+.sq-cash { display: flex; justify-content: space-between; align-items: center; background: rgba(40,70,90,.72); padding: 4px 10px; font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+.sq-cash i { font-style: normal; width: 20px; height: 20px; display: grid; place-items: center; border: 1px solid #fff; border-radius: 50%; font-size: 12px; }
+.sq2 { background: linear-gradient(90deg, rgba(20,30,40,.8), rgba(20,30,40,.35)); padding: 5px 10px 7px; border-left: 3px solid var(--c); }
+.sq2.me { background: linear-gradient(90deg, rgba(40,55,70,.9), rgba(30,40,50,.45)); padding-bottom: 8px; }
+.sq-h { display: flex; align-items: center; gap: 7px; font-size: 16px; }
+.sq-h em { font-style: normal; width: 17px; height: 17px; border-radius: 50%; background: var(--c); color: #111; font-weight: 700; font-size: 12px; display: grid; place-items: center; }
+.sq-h b { color: var(--c); letter-spacing: 1px; font-weight: 600; } .sq-d { margin-left: auto; font-size: 13px; opacity: .7; }
+.sq-st { font-size: 12px; margin-left: auto; letter-spacing: 1px; }
+.sq2 .bars i::after { background: #4fa8ff; } .sq2 .hp { height: 4px; transform: none; } .sq2 .hp i { background: #f2f4f6; }
+/* equipamentos ao lado do squad */
+#equip { position: absolute; left: 292px; bottom: 26px; display: flex; gap: 6px; }
+.eq { width: 58px; height: 64px; background: rgba(20,30,40,.75); border: 1px solid rgba(255,255,255,.12); display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; }
+.eq b { font-size: 22px; } .eq span { font-size: 10px; letter-spacing: 1px; opacity: .7; margin-top: 3px; } .eq small { margin-top: 3px; }
+#invHint { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 2px; font-size: 13px; letter-spacing: 2px; opacity: .8; }
+/* card da arma */
+#weapon { right: 30px; bottom: 26px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+#weapon .gear { display: flex; gap: 14px; }
+#weapon .g { display: flex; align-items: center; gap: 4px; font-size: 18px; text-shadow: 0 1px 3px #000; } #weapon .g i { font-style: normal; font-size: 22px; } #weapon .g small { display: block; }
+.wcard { width: 250px; background: linear-gradient(90deg, rgba(20,30,40,.35), rgba(20,30,40,.85)); border-bottom: 3px solid var(--rc); padding: 6px 10px 5px; }
+.wc-name { text-align: right; font-size: 17px; font-weight: 600; letter-spacing: 1px; }
+.wc-body { display: flex; align-items: flex-end; justify-content: space-between; gap: 8px; margin-top: 2px; }
+.wc-body img { width: 128px; height: 50px; object-fit: contain; object-position: left center; filter: drop-shadow(0 1px 2px #000); }
+.wc-knife { font-size: 38px; }
+.wc-ammo { display: flex; align-items: baseline; gap: 6px; line-height: 1; }
+.wc-ammo b { font-size: 46px; font-weight: 700; transition: transform .06s, color .2s; transform-origin: right bottom; } .wc-ammo b.kick { transform: scale(1.06); } .wc-ammo b.low { color: #ff5050; }
+.wc-ammo span { font-size: 20px; opacity: .75; }
+.wc-foot { display: flex; gap: 8px; align-items: center; font-size: 12px; letter-spacing: 1px; margin-top: 2px; } .wc-foot .dots { color: var(--accent); letter-spacing: 2px; } .wc-foot .mode { margin-left: auto; opacity: .8; }
+.wc-other { text-align: right; font-size: 12px; opacity: .6; margin-top: 3px; letter-spacing: 1px; }
+/* card de loot (EQUIPAR / MARCAR) */
+#prompt { top: auto; bottom: 150px; background: none; border: 0; padding: 0; font-size: 15px; text-shadow: 0 1px 3px #000; }
+.lc-keys { display: flex; justify-content: space-between; gap: 30px; font-size: 14px; letter-spacing: 1px; margin-bottom: 4px; }
+.lootcard { display: flex; gap: 10px; align-items: center; width: 250px; background: linear-gradient(90deg, rgba(20,20,30,.85), color-mix(in srgb, var(--rc) 45%, rgba(20,20,30,.85))); border: 1px solid var(--rc); box-shadow: 0 0 14px color-mix(in srgb, var(--rc) 50%, transparent); padding: 6px 10px; }
+.lootcard img { width: 96px; height: 40px; object-fit: contain; }
+.lootcard b { display: block; font-size: 18px; } .lootcard small { display: block; font-size: 12px; opacity: .8; } .lootcard em { font-style: normal; font-size: 12px; color: var(--rc); font-weight: 700; letter-spacing: 1px; }
+/* faixa de contrato aceito */
+#banner { position: absolute; top: 17%; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; opacity: 0; pointer-events: none; }
+#banner .bn-ic { width: 88px; height: 88px; display: grid; place-items: center; font-size: 44px; color: #111; background: #e8b13a; clip-path: polygon(50% 0, 100% 22%, 100% 70%, 50% 100%, 0 70%, 0 22%); margin-bottom: -8px; z-index: 1; }
+#banner .bn-row { display: flex; align-items: center; gap: 16px; background: linear-gradient(90deg, transparent, rgba(20,24,30,.92) 12%, rgba(20,24,30,.92) 88%, transparent); padding: 10px 40px; }
+#banner .bn-row b { font-size: 34px; letter-spacing: 3px; color: #ffd24d; font-weight: 700; } #banner .bn-row i { font-style: normal; font-size: 40px; color: #e8b13a; font-weight: 700; }
+#banner.show { animation: bn 3.4s ease-out forwards; }
+@keyframes bn { 0% { opacity: 0; transform: translateX(-50%) scale(1.25); } 7% { opacity: 1; transform: translateX(-50%) scale(1); } 85% { opacity: 1; } 100% { opacity: 0; } }
+#center { font-family: var(--lb-font); font-weight: 700; font-size: 30px; }
+#killfeed { top: 70px; right: 30px; font-size: 15px; } #killfeed div { background: rgba(20,30,40,.7); }
+/* mira branca ao mirar (estilo CoD) */
+#adsDot { width: 4px; height: 4px; margin: -2px; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.65), 0 0 4px rgba(255,255,255,.6); }
+#crosshair i { background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.45); }
+
+/* ================================================================ telas no estilo do lobby: carregamento, pausa, fim, controles */
+#loading, #pause, #end { font-family: var(--lb-font); }
+#loading .load-bg { position: absolute; inset: 0; background: linear-gradient(90deg, rgba(8,10,13,.95) 0%, rgba(8,10,13,.7) 45%, rgba(8,10,13,.2)), url("../assets/ui/squad_4.jpg") right center/cover, #0b0d10; }
+#loading .load-box { position: absolute; left: 74px; bottom: 90px; top: auto; transform: none; width: 560px; text-align: left; background: none; }
+#loading .lb-brand { width: auto; margin-bottom: 40px; } #loading .lb-brand b, #loading .lb-brand span { font-size: 56px; }
+.load-mode { display: flex; align-items: center; gap: 14px; margin-bottom: 26px; }
+.load-mode b { font-size: 34px; letter-spacing: 2px; font-weight: 600; } .load-mode small { display: block; font-size: 15px; letter-spacing: 3px; color: var(--teal-2); }
+#loadStage { font-size: 20px; letter-spacing: 2px; margin-bottom: 10px; }
+#loading .load-bar { height: 6px; background: rgba(255,255,255,.1); border: 1px solid rgba(88,199,216,.35); } #loading .load-bar i { background: linear-gradient(90deg, var(--teal), var(--teal-2)); box-shadow: 0 0 12px rgba(88,199,216,.6); }
+#loadTip { margin-top: 18px; font-size: 16px; opacity: .8; letter-spacing: .5px; max-width: 520px; }
+.lb-brand.small b, .lb-brand.small span { font-size: 26px; } .lb-brand.small { width: auto; margin-bottom: 18px; }
+#pause { background: radial-gradient(ellipse at 70% 50%, rgba(0,0,0,.25), rgba(0,0,0,.75)); }
+#pause .pause-box { position: absolute; left: 74px; top: 90px; bottom: 60px; width: 460px; transform: none; padding: 28px; display: flex; flex-direction: column; gap: 8px; overflow-y: auto; background: rgba(12,15,19,.88); }
+#pause h2 { font-size: 44px; letter-spacing: 5px; margin-bottom: 4px; } #pause #pauseSub { font-size: 15px; margin-bottom: 14px; }
+#pause button.cta, #pause button.ghost, #end button.cta, #end button.ghost { clip-path: none; font-family: var(--lb-font); font-size: 20px; font-weight: 700; letter-spacing: 3px; padding: 12px 18px; text-align: left; }
+#pause button.cta, #end button.cta { background: linear-gradient(135deg, #1b6f82, #0d3a46); color: #e8fbff; border: 1px solid rgba(88,199,216,.8); } #pause button.cta:hover, #end button.cta:hover { box-shadow: 0 0 18px rgba(88,199,216,.45); }
+#pause button.ghost, #end button.ghost { background: rgba(255,255,255,.04); color: #dfe6ec; border: 1px solid rgba(255,255,255,.12); } #pause button.ghost:hover, #end button.ghost:hover { background: rgba(255,255,255,.1); }
+#pause button.danger { color: #ff8a80; border-color: rgba(255,90,80,.35); }
+#pausePanel { margin-top: 10px; }
+#end { background: radial-gradient(ellipse at 50% 40%, rgba(0,0,0,.3), rgba(0,0,0,.85)); }
+#end .end-box { width: min(980px, calc(100vw - 80px)); padding: 26px 30px; background: rgba(12,15,19,.9); }
+#end h1 { font-size: 64px; letter-spacing: 6px; } #end .actions { justify-content: flex-end; gap: 10px; }
+.ctl-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; grid-column: 1 / -1; }
+.ghost.small { font-size: 13px !important; padding: 6px 12px !important; clip-path: none; }
+.keybtn { min-width: 74px; padding: 4px 10px; font: 700 15px var(--lb-font); letter-spacing: 1px; background: #e6ecf0; color: #111; border: 0; }
+.keybtn:hover { background: #fff; box-shadow: 0 0 10px rgba(88,199,216,.6); } .keybtn.wait { background: var(--teal); color: #fff; animation: lowhp .5s infinite alternate; }
+#weapon .wc-foot .rar { display: inline; width: auto; height: auto; transform: none; }
+/* telas mais baixas: HUD compacto */
+@media (max-height: 820px) {
+  #mmWrap { width: 180px; height: 180px; } #zoneInfo { top: 202px; width: 180px; font-size: 14px; } #contract { top: 236px; width: 180px; }
+  #squad { width: 220px; } .sq2 { padding: 3px 8px 5px; } .sq-h { font-size: 14px; } #equip { left: 260px; }
+  .wcard { width: 220px; } .wc-ammo b { font-size: 38px; }
+}
+.lb-brand { width: auto; flex-wrap: wrap; } .lb-brand small { flex-basis: 100%; }
+#menu.lobby .lb-top { gap: 22px; }
+@media (max-width: 1750px) { .lb-tabs .nav { font-size: 16px; padding: 4px 11px; letter-spacing: 1px; } .lb-brand b, .lb-brand span { font-size: 28px; } .lb-subtabs { padding-left: 20px; font-size: 14px; } }

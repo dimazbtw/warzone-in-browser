@@ -19,7 +19,10 @@ export class WeaponSystem {
 
   requestFire(p, msg) {
     const { ctx } = this, now = ctx.now();
-    if (!p.is(PS.ALIVE) || p.action?.blocksFire) return;
+    if (!p.is(PS.ALIVE)) return;
+    if (p.action?.type === 'plate') { ctx.systems.inventory.cancelPlates(p); return; }   // atirar cancela as placas
+    if (p.inv?.active === 'knife') return this.requestMelee(p, msg);                      // faca na mão: clique golpeia
+    if (p.action?.blocksFire) return;
     const w = ctx.systems.inventory.active(p); if (!w) return;
     const def = ctx.cfg.weapons[w.id];
     if (w.mag <= 0) { ctx.systems.inventory.requestReload(p); return; }
@@ -133,6 +136,7 @@ export class WeaponSystem {
   /** Golpe à frente (arco); em inimigo abatido é finalização. */
   requestMelee(p, msg) {
     const { ctx } = this, M = ctx.cfg.equipment.melee, now = ctx.now();
+    if (p.action?.type === 'plate') ctx.systems.inventory.cancelPlates(p);
     if (!p.is(PS.ALIVE) || p.action?.blocksFire || now < (p.meleeReadyAt ?? 0)) return;
     p.meleeReadyAt = now + M.cooldown;
     const yaw = Number.isFinite(msg.yaw) ? msg.yaw : p.yaw, fx = -Math.sin(yaw), fz = -Math.cos(yaw);

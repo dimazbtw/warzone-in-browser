@@ -22,7 +22,7 @@ export class InventorySystem {
       tactical: kit ? 0 : 1,
       cash: p.inv?.cash ?? 0,              // dinheiro é mantido entre vidas
     };
-    if (kit) for (const w of kit.weapons) this.giveWeapon(p, w);
+    if (kit) for (const w of kit.weapons) if (![p.inv.primary?.id, p.inv.secondary?.id].includes(w)) this.giveWeapon(p, w);
     p.armor = kit ? kit.armorPlates * cfg.health.plates.hpPerPlate : 0;
     p.action = null;
   }
@@ -30,10 +30,15 @@ export class InventorySystem {
   magSize(w) { return Math.round(this.ctx.cfg.weapons[w.id].mag * (this.ctx.cfg.rarity?.[w.rarity]?.mag ?? 1)); }
   active(p) { return p.inv?.[p.inv.active] ?? null; }
 
-  /** Coloca a arma no slot dela; devolve a arma antiga (vira loot no chão). */
+  /**
+   * Qualquer arma vai em qualquer slot: slot vazio primeiro; com os dois cheios,
+   * substitui a arma que está NA MÃO (dá para ter SMG + sniper). Devolve a antiga (vira loot).
+   */
   giveWeapon(p, id, mag, rarity = 'common') {
     const def = this.ctx.cfg.weapons[id]; if (!def) return null;
-    const slot = def.slot, old = p.inv[slot];
+    const inv = p.inv, empty = ['primary', 'secondary'].find(k => !inv[k]);
+    const slot = empty ?? (inv.active === 'knife' ? 'primary' : inv.active), old = empty ? null : inv[slot];
+    this.cancelPlates(p);
     p.inv[slot] = this.weapon(id, rarity); if (mag !== undefined) p.inv[slot].mag = mag;
     p.inv.active = slot; this.cancelAction(p, 'reload');
     return old;
@@ -56,20 +61,28 @@ export class InventorySystem {
 
   requestReload(p) {
     const w = this.active(p); if (!w || !p.is(PS.ALIVE)) return;
+    this.cancelPlates(p);
     const def = this.ctx.cfg.weapons[w.id];
     if (w.mag >= this.magSize(w) || !p.inv.ammo[def.ammo]) return;
     this.startAction(p, 'reload', def.reload, { slow: 0.8 });
   }
   requestSwitch(p, slot) {
-    if (!p.is(PS.ALIVE) || !['primary', 'secondary'].includes(slot) || !p.inv[slot]) return;
-    this.cancelAction(p, 'reload'); p.inv.active = slot;
-    p.inv[slot].nextFireAt = Math.max(p.inv[slot].nextFireAt, this.ctx.now() + 0.35);
+    if (!p.is(PS.ALIVE) || !['primary', 'secondary', 'knife'].includes(slot)) return;
+    if (slot !== 'knife' && !p.inv[slot]) return;
+    this.cancelAction(p, 'reload'); this.cancelPlates(p); p.inv.active = slot;
+    if (slot !== 'knife') p.inv[slot].nextFireAt = Math.max(p.inv[slot].nextFireAt, this.ctx.now() + 0.35);
   }
+  /** Placas em cadeia: aplica uma atrás da outra até encher, acabar ou o jogador cancelar. */
   requestPlate(p) {
     const h = this.ctx.cfg.health.plates;
-    if (!p.is(PS.ALIVE) || p.inv.plates <= 0 || p.armor >= h.maxEquipped * h.hpPerPlate) return;
+    if (!p.is(PS.ALIVE) || p.inv.plates <= 0 || p.armor >= h.maxEquipped * h.hpPerPlate) { p.plateChain = false; return; }
+    if (p.action?.type === 'plate') return;
+    if (p.action?.type === 'reload') this.cancelAction(p, 'reload');
+    p.plateChain = true;
     this.startAction(p, 'plate', h.applyTime, { slow: 0.6, blocksAds: true, blocksFire: true });
   }
+  /** Cancela a colocação de placas (trocar de arma, pular, atirar, faca, recarregar, interagir). */
+  cancelPlates(p) { p.plateChain = false; this.cancelAction(p, 'plate'); }
   requestHeal(p) {
     if (!p.is(PS.ALIVE) || p.inv.heals <= 0 || p.hp >= this.ctx.cfg.health.max) return;
     this.startAction(p, 'heal', this.ctx.cfg.health.healItem.useTime, { blocksFire: true });
@@ -89,7 +102,7 @@ export class InventorySystem {
         w.mag += take; p.inv.ammo[def.ammo] -= take;
       } else if (a.type === 'plate') {
         p.inv.plates--; this.ctx.systems.armor.applyPlate(p);
-        if (p.input.interactPlateChain) this.requestPlate(p);
+        if (p.plateChain) this.requestPlate(p);
       } else if (a.type === 'heal') {
         p.inv.heals--; p.hp = Math.min(this.ctx.cfg.health.max, p.hp + this.ctx.cfg.health.healItem.heal);
       }
@@ -99,7 +112,7 @@ export class InventorySystem {
   /** Itens que caem ao morrer. */
   dropList(p) {
     const out = [];
-    for (const slot of ['primary', 'secondary']) if (p.inv[slot] && p.inv[slot].id !== 'sidearm') out.push({ type: 'weapon', data: { id: p.inv[slot].id, mag: p.inv[slot].mag, rarity: p.inv[slot].rarity ?? 'common' } });
+    for (const slot of ['primary', 'secondary']) if (p.inv[slot] && !(p.inv[slot].id === 'sidearm' && p.inv[slot].rarity === 'common')) out.push({ type: 'weapon', data: { id: p.inv[slot].id, mag: p.inv[slot].mag, rarity: p.inv[slot].rarity ?? 'common' } });
     for (const [t, n] of Object.entries(p.inv.ammo)) if (n > 0) out.push({ type: 'ammo', data: { ammo: t, amount: n } });
     if (p.inv.plates > 0) out.push({ type: 'plate', data: { amount: p.inv.plates } });
     const cash = Math.floor(p.inv.cash / 2);

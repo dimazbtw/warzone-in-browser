@@ -121,7 +121,7 @@ export class Match {
         const inp = MovementSystem.sanitize(msg, p.input);
         inp.seq = Number.isFinite(msg.seq) ? msg.seq : 0;
         inp.dt = Math.min(1 / 15, Math.max(0.001, Number(msg.dt) || 1 / 30));
-        inp.interactPlateChain = msg.plateChain === true;
+        if (inp.jump && p.action?.type === 'plate') S.inventory.cancelPlates(p);   // pular cancela as placas
         (p.inputQueue ??= []).push(inp);
         if (p.inputQueue.length > 30) p.inputQueue.shift();
         break;
@@ -140,7 +140,7 @@ export class Match {
       }
       case C2S.RELOAD: S.inventory.requestReload(p); break;
       case C2S.SWITCH: S.inventory.requestSwitch(p, msg.slot); break;
-      case C2S.PICKUP: S.loot.requestPickup(p, msg.lootId); break;
+      case C2S.PICKUP: S.inventory.cancelPlates(p); S.loot.requestPickup(p, msg.lootId); break;
       case C2S.CHEST: S.loot.requestChest(p, msg.chestId); break;
       case C2S.USE_PLATE: S.inventory.requestPlate(p); break;
       case C2S.USE_HEAL: S.inventory.requestHeal(p); break;

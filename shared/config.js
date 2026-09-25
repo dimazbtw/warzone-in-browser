@@ -34,7 +34,13 @@ export const CONFIG = {
 
   // ---------------- MOVIMENTO (autoritativo) ----------------
   movement: {
-    walk: 6.0, sprint: 8.6, tacticalSprint: 10.8, crouch: 3.2, prone: 1.4, ads: 3.6,
+    walk: 5.4, sprint: 7.8, tacticalSprint: 9.8, crouch: 2.9, prone: 1.3, ads: 3.1,
+    // peso da arma na mão: multiplica a velocidade (faca/pistola leves, precisão pesada)
+    weaponWeight: { knife: 1.06, pistol: 1.0, smg: 0.97, ar: 0.93, shotgun: 0.93, dmr: 0.89, sniper: 0.86 },
+    fallGravity: 1.25,           // cair é mais "pesado" que subir (sensação de peso)
+    terminalVelocity: 55,
+    fallDamage: { safeSpeed: 16, perMs: 9 },   // m/s de impacto acima do seguro × dano
+    chuteMinHeight: 7,           // altura mínima do chão para abrir o paraquedas num salto
     jumpVelocity: 7.5,
     gravity: 22,
     freefallSpeed: 48, freefallHorizontal: 26,

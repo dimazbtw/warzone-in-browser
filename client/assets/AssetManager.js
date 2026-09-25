@@ -12,6 +12,7 @@ export const ASSET_LIST = {
   aircraft:   { local: 'assets/models/aircraft.glb', size: 3.1e5, label: 'Aeronave' },
   arms:       { local: 'assets/models/arms.glb', size: 1.2e6, label: 'Braços (1ª pessoa)' },
   parachute:  { local: 'assets/models/parachute.glb', size: 7e4, label: 'Paraquedas' },
+  crate:      { local: 'assets/models/crate.glb', size: 5.5e5, label: 'Baú de suprimentos' },
   // armas enviadas pelo usuário (otimizadas: texturas WebP ≤1024 px, AK simplificado)
   'w_pistol_1': { local: 'assets/models/weapons/pistol_1.glb', size: 2.0e6, label: 'Arma' },
   'w_pistol_2': { local: 'assets/models/weapons/pistol_2.glb', size: 0.37e6, label: 'Arma' },
