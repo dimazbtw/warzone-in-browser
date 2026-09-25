@@ -82,10 +82,29 @@ export class GameSession {
     this.world.startMatch(p); this.avatars.clear();
     if (this.self) { this.world.scene.remove(this.self.root, this.self.weapon); }
     this.self = characters.create({ operator: settings.get('operator') }); this.world.scene.add(this.self.root, this.self.weapon); this.self.root.visible = false;
+    this.warmup();
     this.boards = new Map((p.boards ?? []).map(b => [b.id, b])); this.stations = p.stations ?? [];
     this.input.enabled = true; this.input.resetToggles();
     this.hud.announce('A AERONAVE DECOLOU', 3); this.audio.warn();
     this.requestLock();
+  }
+  /**
+   * Pré-aquecimento: compila na GPU os shaders de tudo que vai aparecer (operadores de
+   * todas as cores, cada arma, loot, fumaça) antes de jogar — sem isso cada coisa nova
+   * que entra na tela pela 1ª vez trava o jogo por dezenas de ms.
+   */
+  warmup() {
+    const w = this.world, tmp = new THREE.Group(), made = [];
+    for (let op = 0; op < 4; op++) {
+      const c = characters.create({ operator: op }); c.setWeapon(['rifle', 'smg', 'shotgun', 'marksman'][op]);
+      c.root.position.set(op * 2, -500, 0); c.weapon.position.set(op * 2, -500, 0); tmp.add(c.root, c.weapon); made.push(c);
+    }
+    for (const id of Object.keys(this.cfg?.weapons ?? {})) { const g = characters.gun(id); g.position.y = -500; tmp.add(g); }
+    this.effects.smoke({ x: 0, y: -500, z: 0 }, 1, 0.01);
+    this.vm.setWeapon('rifle');
+    w.scene.add(tmp);
+    try { w.renderer.compile(w.scene, w.camera); } catch (e) { console.warn('warmup', e); }
+    w.scene.remove(tmp); this.vm.setWeapon(null);
   }
   onSnap(s) {
     const prev = this.snap?.you.s;

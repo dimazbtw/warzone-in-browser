@@ -7,7 +7,7 @@ export const DEFAULTS = {
   name: '', operator: 0,
   sensitivity: 0.0022, adsSensitivity: 0.65, fov: 78, invertY: false,
   volume: 0.8, sfxVolume: 1, musicVolume: 0.35,
-  quality: 'high',            // 'low' | 'medium' | 'high'
+  quality: (globalThis.navigator?.hardwareConcurrency ?? 4) >= 8 ? 'high' : 'medium',           // 'low' | 'medium' | 'high'
   showFps: false, damageNumbers: true, crouchToggle: false, aimToggle: false,
   lastMode: { squadSize: 2, difficulty: 'normal', players: 40 },
 };

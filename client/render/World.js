@@ -5,6 +5,7 @@ import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { mat, part } from './Models.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { MapRenderer } from './MapRenderer.js';
 
 const RARITY = { common: 0xbbbbbb, uncommon: 0x6fd16f, rare: 0x4fa8ff, epic: 0xb36bff, legendary: 0xffb13a };
@@ -62,7 +63,7 @@ export class World {
 
   // ------------------------------------------------------------ partida
   startMatch(payload) {
-    this.dynamic.clear(); this.loot.clear();
+    this.dynamic.clear(); this.loot.clear(); if (this.lootInst) this.lootInst.list.length = 0;
     // zona
     this.zoneWall = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 220, 96, 1, true), new THREE.ShaderMaterial({
       transparent: true, side: THREE.DoubleSide, depthWrite: false, uniforms: { time: { value: 0 } },
@@ -95,12 +96,17 @@ export class World {
     // baús de suprimento
     this.chestMeshes = new Map();
     const crateMat = new THREE.MeshStandardMaterial({ color: 0x3d4a2a, roughness: 0.8 }), trimMat = new THREE.MeshStandardMaterial({ color: 0xe8b13a, emissive: 0x6a4a00, emissiveIntensity: 0.8 });
+    // 1 mesh por baú (geometria fundida e compartilhada; aberto = troca de geometria)
+    const box = (w, h, d, x, y, z, rx = 0) => { const g = new THREE.BoxGeometry(w, h, d); if (rx) g.rotateX(rx); g.translate(x, y, z); return g; };
+    const crate = [box(1.1, 0.55, 0.65, 0, 0.28, 0)], trim = box(1.14, 0.06, 0.69, 0, 0.52, 0);
+    this.chestGeo = {
+      closed: mergeGeometries([mergeGeometries([...crate, box(1.12, 0.12, 0.67, 0, 0.6, 0)]), trim], true),
+      open: mergeGeometries([mergeGeometries([...crate, box(1.12, 0.12, 0.67, 0, 0.75, -0.35, -1.9)]), trim], true),
+    };
+    this.chestMats = { closed: [crateMat, trimMat], open: [crateMat, mat(0x333333)] };
     for (const c of payload.chests ?? []) {
-      const k = new THREE.Group();
-      const body = part(new THREE.BoxGeometry(1.1, 0.55, 0.65), crateMat, 0, 0.28, 0), lid = part(new THREE.BoxGeometry(1.12, 0.12, 0.67), crateMat, 0, 0.6, 0);
-      const trim = part(new THREE.BoxGeometry(1.14, 0.06, 0.69), trimMat, 0, 0.52, 0);
-      k.add(body, lid, trim); k.position.set(c.x, c.y, c.z); k.rotation.y = c.rot ?? 0; k.userData = { lid, trim, item: c };
-      k.traverse(o => { if (o.isMesh) o.castShadow = true; });
+      const k = new THREE.Mesh(this.chestGeo.closed, this.chestMats.closed);
+      k.position.set(c.x, c.y, c.z); k.rotation.y = c.rot ?? 0; k.userData = { item: c }; k.castShadow = true;
       this.dynamic.add(k); this.chestMeshes.set(c.id, k); if (c.opened) this.setChestOpened(c.id);
     }
     // aeronave
@@ -113,23 +119,57 @@ export class World {
     this.contractMarker.position.y = 30; this.contractMarker.visible = false; this.dynamic.add(this.contractMarker);
   }
 
+  /**
+   * Loot instanciado: TODOS os itens do chão em 2 draw calls (núcleo + feixe de raridade),
+   * em vez de 2 meshes com material próprio por item. Cor por instância.
+   */
+  lootBatch() {
+    if (this.lootInst) return this.lootInst;
+    const MAX = 1024;
+    const core = new THREE.InstancedMesh(new THREE.BoxGeometry(0.3, 0.3, 0.3), new THREE.MeshStandardMaterial({ roughness: 0.5, emissive: 0xffffff, emissiveIntensity: 0.3 }), MAX);
+    const beam = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.06, 0.06, 6, 6, 1, true).translate(0, 3, 0), new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.25, depthWrite: false }), MAX);
+    for (const m of [core, beam]) { m.count = 0; m.frustumCulled = false; m.instanceMatrix.setUsage(THREE.DynamicDrawUsage); m.setColorAt(0, new THREE.Color()); }
+    core.material.onBeforeCompile = sh => { sh.fragmentShader = sh.fragmentShader.replace('vec3 totalEmissiveRadiance = emissive;', 'vec3 totalEmissiveRadiance = emissive * vColor;'); };
+    this.lootInst = { core, beam, list: [], beams: [] };
+    return this.lootInst;
+  }
   addLoot(it) {
     if (this.loot.has(it.id)) return;
-    const m = this.lootPool.pop() ?? this.makeLootMesh();
-    const color = it.type === 'weapon' ? RARITY[it.rarity] : LOOT_COLOR[it.type] ?? 0xffffff;
-    m.userData.core.material = mat(color, { emissive: color, emissiveIntensity: 0.35 });
-    m.userData.core.scale.set(it.type === 'weapon' ? 2.6 : 1, it.type === 'weapon' ? 0.45 : 1, it.type === 'weapon' ? 0.6 : 1);
-    m.userData.beam.visible = ['rare', 'epic', 'legendary'].includes(it.rarity) || it.type === 'intel';
-    m.userData.beam.material = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.25, depthWrite: false });
-    m.position.set(it.x, it.y + 0.35, it.z); m.userData.item = it; m.visible = true;
-    this.dynamic.add(m); this.loot.set(it.id, m);
+    const L = this.lootBatch();
+    if (!L.core.parent) this.dynamic.add(L.core, L.beam);
+    const color = new THREE.Color(it.type === 'weapon' ? RARITY[it.rarity] : LOOT_COLOR[it.type] ?? 0xffffff);
+    const e = { userData: { item: it }, color, weapon: it.type === 'weapon', beam: ['rare', 'epic', 'legendary'].includes(it.rarity) || it.type === 'intel', idx: L.list.length };
+    L.list.push(e); this.loot.set(it.id, e); this.lootDirty = true;
   }
-  makeLootMesh() {
-    const g = new THREE.Group(), core = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 0.3)), beam = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 6, 6, 1, true));
-    beam.position.y = 3; g.add(core, beam); g.userData = { core, beam }; return g;
+  removeLoot(id) {
+    const e = this.loot.get(id); if (!e) return;
+    const L = this.lootInst, last = L.list.pop();
+    if (last !== e) { L.list[e.idx] = last; last.idx = e.idx; }
+    this.loot.delete(id); this.lootDirty = true;
   }
-  removeLoot(id) { const m = this.loot.get(id); if (!m) return; this.dynamic.remove(m); this.loot.delete(id); this.lootPool.push(m); }
-  setChestOpened(id) { const k = this.chestMeshes?.get(id); if (!k) return; k.userData.item.opened = true; k.userData.lid.rotation.x = -1.9; k.userData.lid.position.set(0, 0.75, -0.35); k.userData.trim.material = mat(0x333333); }
+  /** Atualiza as instâncias: gira os núcleos e esconde itens longe (> 90 m). */
+  updateLoot(dt, camPos) {
+    // baús: some além de 140 m, sombra só até 50 m
+    if (this.chestMeshes) for (const k of this.chestMeshes.values()) { const d2 = (k.position.x - camPos.x) ** 2 + (k.position.z - camPos.z) ** 2; k.visible = d2 < 140 * 140; k.castShadow = d2 < 2500; }
+    const L = this.lootInst; if (!L) return;
+    this.lootSpin = (this.lootSpin ?? 0) + dt * 1.5;
+    const m4 = this._m4 ??= new THREE.Matrix4(), q = this._q ??= new THREE.Quaternion(), p = this._p ??= new THREE.Vector3(), sc = this._s ??= new THREE.Vector3(), UP = this._up ??= new THREE.Vector3(0, 1, 0);
+    q.setFromAxisAngle(UP, this.lootSpin);
+    let n = 0, nb = 0;
+    for (const e of L.list) {
+      const it = e.userData.item, dx = it.x - camPos.x, dz = it.z - camPos.z, d2 = dx * dx + dz * dz;
+      if (d2 > (e.beam ? 250 * 250 : 90 * 90)) continue;
+      p.set(it.x, it.y + 0.35, it.z);
+      if (d2 < 90 * 90) {
+        sc.set(e.weapon ? 2.6 : 1, e.weapon ? 0.45 : 1, e.weapon ? 0.6 : 1);
+        L.core.setMatrixAt(n, m4.compose(p, q, sc)); L.core.setColorAt(n, e.color); n++;
+      }
+      if (e.beam) { sc.set(1, 1, 1); L.beam.setMatrixAt(nb, m4.compose(p, this._q0 ??= new THREE.Quaternion(), sc)); L.beam.setColorAt(nb, e.color); nb++; }
+    }
+    L.core.count = n; L.beam.count = nb;
+    for (const m of [L.core, L.beam]) { m.instanceMatrix.needsUpdate = true; if (m.instanceColor) m.instanceColor.needsUpdate = true; }
+  }
+  setChestOpened(id) { const k = this.chestMeshes?.get(id); if (!k) return; k.userData.item.opened = true; k.geometry = this.chestGeo.open; k.material = this.chestMats.open; }
   setBoard(id, taken) { const m = this.boardMeshes?.get(id); if (m) m.visible = !taken; }
 
   update(dt, snap, camPos, time) {
@@ -143,7 +183,7 @@ export class World {
       this.contractMarker.visible = !!pt;
       if (pt) { const r = c.area?.r ?? (c.lastSeen ? 15 : 2); this.contractMarker.scale.set(r, 1, r); this.contractMarker.position.x = pt.x; this.contractMarker.position.z = pt.z; }
     }
-    for (const m of this.loot.values()) { m.userData.core.rotation.y += dt * 1.5; }
+    this.updateLoot(dt, camPos);
     this.sun.position.set(camPos.x - 120, 160, camPos.z + 60); this.sun.target.position.set(camPos.x, 0, camPos.z);
     this.sky.position.copy(camPos); this.sky.material.uniforms.time.value = time;
     this.grade.uniforms.time.value = time % 100;
@@ -198,6 +238,22 @@ export class World {
     this.renderer.setSize(innerWidth, innerHeight); this.composer.setSize(innerWidth, innerHeight);
     this.scene.traverse(o => { if (o.material) o.material.needsUpdate = true; });
   }
-  clearMatch() { this.dynamic.clear(); this.loot.clear(); }
-  render() { this.composer.render(); }
+  clearMatch() { this.dynamic.clear(); this.loot.clear(); if (this.lootInst) this.lootInst.list.length = 0; }
+  /**
+   * Resolução dinâmica: mede o tempo médio de quadro e ajusta a escala interna
+   * (entre 55% e o máximo do preset) para segurar ~60 fps em cenas pesadas.
+   */
+  render() {
+    const now = performance.now(), dt = this.lastFrame ? now - this.lastFrame : 16; this.lastFrame = now;
+    if (dt < 250) this.frameAvg = (this.frameAvg ?? 16) * 0.95 + dt * 0.05;
+    if (now - (this.lastScale ?? 0) > 1000 && this.quality) {
+      const max = Math.min(devicePixelRatio, this.quality.pixelRatio), cur = this.renderer.getPixelRatio();
+      let next = cur;
+      if (this.frameAvg > 22) next = Math.max(0.55, cur - 0.15); else if (this.frameAvg < 14) next = Math.min(max, cur + 0.1);
+      if (Math.abs(next - cur) > 0.01) { this.renderer.setPixelRatio(next); this.composer.setPixelRatio?.(next); this.composer.setSize(innerWidth, innerHeight); }
+      this.lastScale = now;
+    }
+    this.composer.render();
+  }
+  get fps() { return 1000 / (this.frameAvg ?? 16); }
 }
