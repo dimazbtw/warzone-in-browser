@@ -54,3 +54,13 @@ test('raridade aumenta o dano da arma', () => {
   };
   assert.ok(dmg('legendary') > dmg('common'));
 });
+
+test('pente vazio recarrega automaticamente', () => {
+  const m = createMatch();
+  const [a] = startAndLand(m, ['A', 'B'], ['p1', 'p2']);
+  const w = m.ctx.systems.inventory.active(a); w.mag = 1; a.inv.ammo.pistol = 30;
+  m.handle(a, { t: 'fire', yaw: 0, pitch: 0 }); m.tick(DT);
+  assert.equal(a.action?.type, 'reload');
+  run(m, 2);
+  assert.ok(w.mag > 0);
+});

@@ -45,6 +45,8 @@ export class WeaponSystem {
       if (ctx.cfg.combat.mode === 'projectile') this.spawnProjectile(p, origin, d, w.id, w.rarity);
       else { const h = this.trace(p, origin, d, def.range * (R.range ?? 1), rewind); if (h) { hits.push(h); this.hit(p, h, w.id, w.rarity); } }
     }
+    // pente zerou: recarrega sozinho (se houver munição de reserva)
+    if (w.mag === 0) ctx.systems.inventory.requestReload(p);
     ctx.bus.emit('shot', { playerId: p.id, weapon: w.id, x: origin.x, y: origin.y, z: origin.z, yaw, pitch, hit: hits[0]?.point });
   }
 
