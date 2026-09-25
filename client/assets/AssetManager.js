@@ -11,7 +11,19 @@ export const ASSET_LIST = {
   operator_1: { local: 'assets/models/operator_1.glb', size: 3.6e5, label: 'Operador Caveira' },
   operator_2: { local: 'assets/models/operator_2.glb', size: 3.9e5, label: 'Operador Duna' },
   aircraft:   { local: 'assets/models/aircraft.glb', size: 3.1e5, label: 'Aeronave' },
-  rifle:   { local: 'assets/models/rifle.glb',   remote: HF + '173843_824599f6-4ea8-4128-bc98-f0fbac851e22.glb', size: 10.6e6, label: 'Fuzil' },
+  arms:       { local: 'assets/models/arms.glb', size: 1.2e6, label: 'Braços (1ª pessoa)' },
+  parachute:  { local: 'assets/models/parachute.glb', size: 7e4, label: 'Paraquedas' },
+  // armas enviadas pelo usuário (otimizadas: texturas WebP ≤1024 px, AK simplificado)
+  'w_pistol_1': { local: 'assets/models/weapons/pistol_1.glb', size: 2.0e6, label: 'Arma' },
+  'w_pistol_2': { local: 'assets/models/weapons/pistol_2.glb', size: 0.37e6, label: 'Arma' },
+  'w_pistol_4': { local: 'assets/models/weapons/pistol_4.glb', size: 0.69e6, label: 'Arma' },
+  'w_smg_1': { local: 'assets/models/weapons/smg_1.glb', size: 1.4e6, label: 'Arma' },
+  'w_smg_2': { local: 'assets/models/weapons/smg_2.glb', size: 0.72e6, label: 'Arma' },
+  'w_smg_4': { local: 'assets/models/weapons/smg_4.glb', size: 1.9e6, label: 'Arma' },
+  'w_rifle_m4': { local: 'assets/models/weapons/rifle_m4.glb', size: 1.6e6, label: 'Arma' },
+  'w_ak-47': { local: 'assets/models/weapons/ak-47.glb', size: 2.3e6, label: 'Arma' },
+  'w_sniper_1': { local: 'assets/models/weapons/sniper_1.glb', size: 1.0e6, label: 'Arma' },
+  'w_sniper_2': { local: 'assets/models/weapons/sniper_2.glb', size: 0.71e6, label: 'Arma' },
 };
 
 class Assets extends EventTarget {

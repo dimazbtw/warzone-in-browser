@@ -1,0 +1,21 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#556}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script></head><body>
+<script type="module">
+// Miniaturas dos GLB crus (cada um enquadrado pela própria caixa). ?files=a,b,c&dir=assets/models/weapons&view=side|front|top
+import * as THREE from 'three'; import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+const q = new URLSearchParams(location.search), files = q.get('files').split(','), dir = q.get('dir') ?? 'assets/models/weapons', view = q.get('view') ?? 'iso';
+const W = 350, H = 230, cols = 4, rows = Math.ceil(files.length / cols);
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); r.setSize(W * cols, H * rows); r.setScissorTest(true); r.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(r.domElement);
+const L = new GLTFLoader();
+for (let i = 0; i < files.length; i++) {
+  const s = new THREE.Scene(); s.background = new THREE.Color(i % 2 ? 0x5a6070 : 0x646a7a);
+  s.add(new THREE.HemisphereLight(0xffffff, 0x445566, 2.4)); const d = new THREE.DirectionalLight(0xffffff, 2); d.position.set(3, 4, 5); s.add(d);
+  const o = (await L.loadAsync(`/${dir}/${files[i]}.glb`)).scene; s.add(o);
+  const b = new THREE.Box3().setFromObject(o), c = b.getCenter(new THREE.Vector3()), sz = b.getSize(new THREE.Vector3()), R = sz.length() / 2;
+  const dirv = view === 'side' ? new THREE.Vector3(1, 0, 0) : view === 'front' ? new THREE.Vector3(0, 0, 1) : view === 'top' ? new THREE.Vector3(0, 1, 0.001) : new THREE.Vector3(1, 0.6, 1).normalize();
+  const cam = new THREE.PerspectiveCamera(30, W / H, R / 100, R * 100); cam.position.copy(c).addScaledVector(dirv, R / Math.tan(15 * Math.PI / 180) * 1.05); cam.lookAt(c);
+  const x = (i % cols) * W, y = (rows - 1 - Math.floor(i / cols)) * H; r.setViewport(x, y, W, H); r.setScissor(x, y, W, H); r.render(s, cam);
+  console.log(files[i], sz.toArray().map(v => v.toFixed(2)).join(' x '));
+}
+window.ready = true;
+</script></body></html>

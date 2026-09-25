@@ -103,15 +103,27 @@ export const CONFIG = {
     projectileGravity: 9.8,
   },
 
-  // Armas originais (nomes fictícios)
+  // Armas originais (nomes fictícios). class = família (animação/som/modelo); auto = segura para rajada;
+  // scope = mira telescópica em ADS. Modelos 3D: client/render/RealWeapons.js
   weapons: {
-    sidearm: { name: 'Vespa 9',     slot: 'secondary', ammo: 'pistol', damage: 24, rpm: 400, mag: 14, reserve: 42,  reload: 1.3, range: 70,  falloff: [[15, 1], [35, 0.8], [70, 0.6]], spreadHip: 0.03, spreadAds: 0.008, recoil: 0.9, projectileSpeed: 380, rarity: 'common' },
-    rifle:   { name: 'Carcará AR',  slot: 'primary',   ammo: 'rifle',  damage: 27, rpm: 720, mag: 30, reserve: 90,  reload: 1.9, range: 180, falloff: [[40, 1], [80, 0.85], [180, 0.7]], spreadHip: 0.045, spreadAds: 0.006, recoil: 1.0, projectileSpeed: 750, rarity: 'uncommon' },
-    battle:  { name: 'Jaguar BR',   slot: 'primary',   ammo: 'rifle',  damage: 38, rpm: 480, mag: 20, reserve: 60,  reload: 2.2, range: 220, falloff: [[50, 1], [120, 0.9], [220, 0.75]], spreadHip: 0.05, spreadAds: 0.004, recoil: 1.4, projectileSpeed: 800, rarity: 'rare' },
-    smg:     { name: 'Colibri SMG', slot: 'primary',   ammo: 'pistol', damage: 21, rpm: 900, mag: 34, reserve: 102, reload: 1.6, range: 80,  falloff: [[12, 1], [25, 0.8], [80, 0.55]], spreadHip: 0.035, spreadAds: 0.012, recoil: 0.7, projectileSpeed: 420, rarity: 'uncommon' },
-    shotgun: { name: 'Tatu 12',     slot: 'primary',   ammo: 'shell',  damage: 16, pellets: 8, rpm: 80, mag: 6, reserve: 24, reload: 2.6, range: 35, falloff: [[8, 1], [16, 0.6], [35, 0.2]], spreadHip: 0.09, spreadAds: 0.07, recoil: 2.5, projectileSpeed: 350, rarity: 'rare' },
-    marksman:{ name: 'Harpia DMR',  slot: 'primary',   ammo: 'sniper', damage: 95, rpm: 60,  mag: 5,  reserve: 20,  reload: 2.8, range: 400, falloff: [[150, 1], [400, 0.9]], spreadHip: 0.08, spreadAds: 0.0008, recoil: 3.0, projectileSpeed: 900, rarity: 'epic', headMultiplier: 2.4 },
+    // pistolas (secundárias)
+    sidearm:  { name: 'Vespa 9',      class: 'pistol', slot: 'secondary', ammo: 'pistol', damage: 24, rpm: 400, mag: 14, reserve: 42,  reload: 1.3, range: 70,  falloff: [[15, 1], [35, 0.8], [70, 0.6]], spreadHip: 0.03, spreadAds: 0.008, recoil: 0.9, projectileSpeed: 380, rarity: 'common' },
+    pistol9:  { name: 'Sagui 9',      class: 'pistol', slot: 'secondary', ammo: 'pistol', damage: 20, rpm: 480, mag: 17, reserve: 51,  reload: 1.2, range: 65,  falloff: [[12, 1], [30, 0.8], [65, 0.55]], spreadHip: 0.028, spreadAds: 0.009, recoil: 0.7, projectileSpeed: 380, rarity: 'common' },
+    pistol45: { name: 'Onça .45',     class: 'pistol', slot: 'secondary', ammo: 'pistol', damage: 34, rpm: 330, mag: 8,  reserve: 32,  reload: 1.5, range: 60,  falloff: [[12, 1], [30, 0.75], [60, 0.55]], spreadHip: 0.035, spreadAds: 0.009, recoil: 1.4, projectileSpeed: 360, rarity: 'uncommon' },
+    // submetralhadoras
+    smg:      { name: 'Colibri SMG',  class: 'smg', auto: true, slot: 'primary', ammo: 'pistol', damage: 21, rpm: 900,  mag: 34, reserve: 102, reload: 1.6, range: 80, falloff: [[12, 1], [25, 0.8], [80, 0.55]], spreadHip: 0.035, spreadAds: 0.012, recoil: 0.7, projectileSpeed: 420, rarity: 'uncommon' },
+    smg2:     { name: 'Morcego SMG',  class: 'smg', auto: true, slot: 'primary', ammo: 'pistol', damage: 18, rpm: 1050, mag: 32, reserve: 96,  reload: 1.7, range: 60, falloff: [[10, 1], [22, 0.75], [60, 0.5]], spreadHip: 0.04, spreadAds: 0.014, recoil: 0.75, projectileSpeed: 400, rarity: 'uncommon' },
+    smg4:     { name: 'Quati SMG',    class: 'smg', auto: true, slot: 'primary', ammo: 'pistol', damage: 24, rpm: 720,  mag: 30, reserve: 90,  reload: 1.8, range: 95, falloff: [[15, 1], [30, 0.85], [95, 0.6]], spreadHip: 0.036, spreadAds: 0.01, recoil: 0.8, projectileSpeed: 430, rarity: 'rare' },
+    // fuzis de assalto
+    rifle:    { name: 'Carcará AR',   class: 'ar', auto: true, slot: 'primary', ammo: 'rifle', damage: 27, rpm: 720, mag: 30, reserve: 90, reload: 1.9, range: 180, falloff: [[40, 1], [80, 0.85], [180, 0.7]], spreadHip: 0.045, spreadAds: 0.006, recoil: 1.0, projectileSpeed: 750, rarity: 'uncommon' },
+    battle:   { name: 'Jaguar AK',    class: 'ar', auto: true, slot: 'primary', ammo: 'rifle', damage: 31, rpm: 600, mag: 30, reserve: 90, reload: 2.3, range: 190, falloff: [[45, 1], [100, 0.85], [190, 0.7]], spreadHip: 0.05, spreadAds: 0.006, recoil: 1.25, projectileSpeed: 715, rarity: 'rare' },
+    // escopeta
+    shotgun:  { name: 'Tatu 12',      class: 'shotgun', slot: 'primary', ammo: 'shell', damage: 16, pellets: 8, rpm: 80, mag: 6, reserve: 24, reload: 2.6, range: 35, falloff: [[8, 1], [16, 0.6], [35, 0.2]], spreadHip: 0.09, spreadAds: 0.07, recoil: 2.5, projectileSpeed: 350, rarity: 'rare' },
+    // precisão
+    marksman: { name: 'Harpia DMR',   class: 'dmr', scope: true, slot: 'primary', ammo: 'sniper', damage: 95, rpm: 60, mag: 5, reserve: 20, reload: 2.8, range: 400, falloff: [[150, 1], [400, 0.9]], spreadHip: 0.08, spreadAds: 0.0008, recoil: 3.0, projectileSpeed: 900, rarity: 'epic', headMultiplier: 2.4 },
+    sniper:   { name: 'Gavião SR',    class: 'sniper', scope: true, slot: 'primary', ammo: 'sniper', damage: 115, rpm: 45, mag: 5, reserve: 15, reload: 3.2, range: 450, falloff: [[200, 1], [450, 0.9]], spreadHip: 0.1, spreadAds: 0.0005, recoil: 3.4, projectileSpeed: 950, rarity: 'epic', headMultiplier: 2.5 },
   },
+
 
   // ---------------- RARIDADE = ACESSÓRIOS ----------------
   // multiplicadores aplicados às armas por raridade (pente, dispersão, recuo, dano, recarga, alcance)

@@ -200,6 +200,9 @@ export class World {
     this.updateLoot(dt, camPos);
     this.sun.position.set(camPos.x - 120, 160, camPos.z + 60); this.sun.target.position.set(camPos.x, 0, camPos.z);
     this.sky.position.copy(camPos); this.sky.material.uniforms.time.value = time;
+    // o céu precisa caber dentro do plano distante; senão a parte à frente é recortada (buraco no centro da tela)
+    this.sky.geometry.boundingSphere ?? this.sky.geometry.computeBoundingSphere();
+    this.sky.scale.setScalar(Math.min(1, (this.camera.far * 0.92) / this.sky.geometry.boundingSphere.radius));
     this.grade.uniforms.time.value = time % 100;
   }
 

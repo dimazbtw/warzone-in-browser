@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { characters } from './characters/CharacterFactory.js';
 import { mat } from './Models.js';
+import { assets } from '../assets/AssetManager.js';
 
 /**
  * Avatars — outros jogadores (e o próprio em 3ª pessoa) com modelos 3D animados.
@@ -18,14 +19,31 @@ export class Avatars {
   }
   setGeo(geo) { this.geo = geo; }
 
+  /** Paraquedas GLB (enviado pelo usuário), normalizado: engate das cordas nos ombros, ~4,2 m de altura. */
+  chuteModel() {
+    if (this.chuteTpl === undefined) {
+      const g = assets.get('parachute'); this.chuteTpl = null;
+      if (g) {
+        const m = g.scene.clone(true); m.updateMatrixWorld(true);
+        const b = new THREE.Box3().setFromObject(m), sz = b.getSize(new THREE.Vector3()), c = b.getCenter(new THREE.Vector3()), k = 4.2 / sz.y;
+        const inner = new THREE.Group(); m.position.set(-c.x, -b.min.y, -c.z); inner.add(m); inner.scale.setScalar(k); inner.position.y = 1.45;
+        m.traverse(o => { if (o.isMesh) { o.material = o.material.clone(); o.material.side = THREE.DoubleSide; o.material.emissive = new THREE.Color(0x2a2a2a); o.material.emissiveIntensity = 0.5; o.castShadow = true; } });
+        this.chuteTpl = inner;
+      }
+    }
+    return this.chuteTpl && this.chuteTpl.clone(true);
+  }
   make(o, lite = false) {
     const c = characters.create({ operator: o.op ?? 0, name: o.n, ally: !!o.a, lite });
-    const chute = new THREE.Group();
+    const chute = new THREE.Group(), real = this.chuteModel();
+    if (real) { chute.add(real); chute.visible = false; c.root.add(chute); c.chute = chute; }
+    else {
     const canopy = new THREE.Mesh(new THREE.SphereGeometry(2.4, 28, 8, 0, Math.PI * 2, 0, Math.PI / 3), this.canopyMat);
     canopy.position.y = 4.6; canopy.scale.set(1.35, 0.5, 0.85); chute.add(canopy);
     const lm = new THREE.LineBasicMaterial({ color: 0x222222 });
     for (const [x, z] of [[-1.9, -0.8], [1.9, -0.8], [-1.9, 0.8], [1.9, 0.8]]) chute.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 1.9, 0), new THREE.Vector3(x, 5.0, z)]), lm));
     chute.visible = false; c.root.add(chute); c.chute = chute;
+    }
     const mk = new THREE.Sprite(this.radarMat); mk.scale.set(0.6, 0.6, 1); mk.position.y = 2.5; mk.visible = false; mk.renderOrder = 11; c.root.add(mk); c.marker = mk;
     this.scene.add(c.root, c.weapon);
     return c;

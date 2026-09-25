@@ -42,7 +42,10 @@ export const OPERATOR_STYLES = [
 
 // ---------- armas ----------
 /** Mapeia armas do servidor → modelo. */
-const GUN_SHAPE = { sidearm: 'pistol', rifle: 'ar', battle: 'br', smg: 'smg', shotgun: 'shotgun', marksman: 'dmr' };
+const GUN_SHAPE = { sidearm: 'pistol', pistol9: 'pistol', pistol45: 'pistol', rifle: 'ar', battle: 'br', smg: 'smg', smg2: 'smg', smg4: 'smg', shotgun: 'shotgun', marksman: 'dmr', sniper: 'dmr' };
+/** Família da arma (animação, som, viewmodel) — espelha `class` do config. */
+export const WEAPON_CLASS = { sidearm: 'pistol', pistol9: 'pistol', pistol45: 'pistol', smg: 'smg', smg2: 'smg', smg4: 'smg', rifle: 'ar', battle: 'ar', shotgun: 'shotgun', marksman: 'dmr', sniper: 'sniper' };
+export const classOf = id => WEAPON_CLASS[id] ?? 'ar';
 const darkMetal = () => mat(0x151515, { metalness: 0.8, roughness: 0.35 });
 const polymer = () => mat(0x2a2a28);
 const wood = () => mat(0x6b3f1f, { roughness: 0.7 });

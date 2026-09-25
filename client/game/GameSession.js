@@ -12,8 +12,8 @@ import { settings } from '../core/Settings.js';
 
 const $ = id => document.getElementById(id);
 const STEP = 1 / 30;
-const PATTERN_SEED = { rifle: 0.3, battle: 1.7, smg: 2.9, sidearm: 4.1, shotgun: 0, marksman: 0 };
-const AUTO = new Set(['rifle', 'smg']);
+/** Semente do padrão de recuo por arma (determinística pelo id). */
+const patternSeed = id => [...(id ?? '')].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) % 997, 7) / 97;
 const ACTION_OPTS = { reload: { slow: 0.8 }, plate: { slow: 0.6, blocksAds: true }, heal: {}, revive: { slow: 0, blocksAds: true } };
 const EYE = { stand: 1.6, crouch: 1.1, prone: 0.45 };
 const RAR_COLOR = { common: '#bbb', uncommon: '#6fd16f', rare: '#4fa8ff', epic: '#b36bff', legendary: '#ffb13a' };
@@ -82,6 +82,7 @@ export class GameSession {
     this.world.startMatch(p); this.avatars.clear();
     if (this.self) { this.world.scene.remove(this.self.root, this.self.weapon); }
     this.self = characters.create({ operator: settings.get('operator') }); this.world.scene.add(this.self.root, this.self.weapon); this.self.root.visible = false;
+    { const ch = this.avatars.chuteModel(); if (ch) { ch.visible = false; this.self.root.add(ch); this.self.chute = ch; } }
     this.warmup();
     this.boards = new Map((p.boards ?? []).map(b => [b.id, b])); this.stations = p.stations ?? [];
     this.input.enabled = true; this.input.resetToggles();
@@ -96,7 +97,7 @@ export class GameSession {
   warmup() {
     const w = this.world, tmp = new THREE.Group(), made = [];
     for (let op = 0; op < 4; op++) {
-      const c = characters.create({ operator: op }); c.setWeapon(['rifle', 'smg', 'shotgun', 'marksman'][op]);
+      const c = characters.create({ operator: op }); c.setWeapon(['rifle', 'smg', 'battle', 'sniper'][op]);
       c.root.position.set(op * 2, -500, 0); c.weapon.position.set(op * 2, -500, 0); tmp.add(c.root, c.weapon); made.push(c);
     }
     for (const id of Object.keys(this.cfg?.weapons ?? {})) { const g = characters.gun(id); g.position.y = -500; tmp.add(g); }
@@ -233,7 +234,7 @@ export class GameSession {
     const y = this.snap?.you; if (!y || y.s !== 'alive' || !y.inv || this.shopOpen || !this.input.enabled) return;
     const w = y.inv[y.inv.active]; if (!w) return;
     const def = this.cfg.weapons[w.id], now = performance.now() / 1000;
-    if (!click && !AUTO.has(w.id)) return;
+    if (!click && !def.auto) return;
     if (now < this.nextFire || y.action?.type === 'plate' || y.action?.type === 'revive') return;
     if (w.mag - this.shotsSinceSnap <= 0) { if (click) { this.audio.tone(220, 0.04, 0.05); this.net.send(C2S.RELOAD); } return; }
     this.nextFire = now + 60 / def.rpm; this.shotsSinceSnap++;
@@ -244,7 +245,7 @@ export class GameSession {
     this.effects.tracer(o.clone().addScaledVector(d, 1.2).add(new THREE.Vector3(0, -0.12, 0)), end); if (wall) this.effects.spark(end);
     // padrão de recuo determinístico por arma (sobe, depois deriva para os lados), escalado pela raridade
     const n = this.recoilShots = (this.recoilShots ?? 0) + 1, rm = (this.cfg.rarity?.[w.rarity]?.recoil ?? 1) * def.recoil * (this.aimNow ? 0.6 : 1) * (y.st === 'crouch' ? 0.8 : y.st === 'prone' ? 0.6 : 1);
-    const up = 0.0075 * rm * (1 + Math.min(n, 12) / 12 * 0.6), side = (Math.sin(n * 0.55 + (PATTERN_SEED[w.id] ?? 0)) * 0.6 + (Math.random() - 0.5) * 0.5) * 0.0035 * rm;
+    const up = 0.0075 * rm * (1 + Math.min(n, 12) / 12 * 0.6), side = (Math.sin(n * 0.55 + patternSeed(w.id)) * 0.6 + (Math.random() - 0.5) * 0.5) * 0.0035 * rm;
     this.input.pitch = Math.min(1.5, this.input.pitch + up); this.input.yaw += side;
     this.recoilDebt = Math.min(0.2, (this.recoilDebt ?? 0) + up * 0.65); this.camKick = (this.camKick ?? 0) + up * 0.6;
   }
@@ -314,7 +315,7 @@ export class GameSession {
     }
     if (window.DEBUG_CAM) { const d = window.DEBUG_CAM; cam.position.set(d.x, d.y, d.z); cam.rotation.set(d.pitch ?? 0, d.yaw ?? 0, 0, 'YXZ'); }   // câmera livre de depuração
     if (this.shake > 0) { cam.position.x += (Math.random() - 0.5) * this.shake; cam.position.y += (Math.random() - 0.5) * this.shake; this.shake = Math.max(0, this.shake - dt * 1.5); }
-    const sniper = aim && w?.id === 'marksman' && st === 'alive';
+    const sniper = aim && !!this.cfg.weapons[w?.id]?.scope && st === 'alive';
     const baseFov = settings.get('fov');
     const fov = st === 'alive' ? (aim ? (sniper ? 22 : baseFov * 0.72) : body.sprinting ? baseFov + 7 : baseFov) : baseFov;
     cam.fov += (fov - cam.fov) * Math.min(1, dt * 12); cam.updateProjectionMatrix();
@@ -322,7 +323,7 @@ export class GameSession {
 
     if (this.self) {
       const show = ['freefall', 'parachute'].includes(st);
-      this.self.root.visible = show; this.self.weapon.visible = false;
+      this.self.root.visible = show; this.self.weapon.visible = false; if (this.self.chute) this.self.chute.visible = st === 'parachute';
       if (show) this.self.animator.update(dt, { x: pos.x, y: pos.y, z: pos.z, yaw: input.yaw, pitch: 0, vx: body.vel.x, vz: body.vel.z, state: st, stance: 'stand', grounded: false, weapon: null });
     }
 
@@ -413,7 +414,7 @@ export class GameSession {
     this.input.removeEventListener('action', this.onAction);
     removeEventListener('keydown', this.keyTab); removeEventListener('keyup', this.keyTab);
     $('shop').removeEventListener('click', this.shopClick); $('shop').classList.add('hidden'); $('bigmap').classList.add('hidden');
-    this.avatars.clear(); if (this.self) this.world.scene.remove(this.self.root, this.self.weapon); this.vm.root.parent?.remove(this.vm.root);
+    this.avatars.clear(); if (this.self) this.world.scene.remove(this.self.root, this.self.weapon); this.vm.space.parent?.remove(this.vm.space);
     this.world.clearMatch?.();
   }
 }

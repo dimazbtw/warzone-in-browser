@@ -1,3 +1,4 @@
+import { classOf } from '../render/Models.js';
 /**
  * AudioSystem — sons 100% sintetizados (sem assets de terceiros), com
  * posicionamento 3D via PannerNode. O listener acompanha a câmera.
@@ -77,7 +78,8 @@ export class AudioSystem {
   }
   /** Tiro em camadas: estalo (transiente), corpo, grave e cauda com reverb; distância abafa os agudos. */
   shot(weapon, pos, local = false) {
-    const p = { sidearm: [1700, 0.12, 0.7], rifle: [1400, 0.16, 1], battle: [1000, 0.22, 1.2], smg: [1900, 0.1, 0.8], shotgun: [700, 0.3, 1.5], marksman: [600, 0.45, 1.6] }[weapon] ?? [1200, 0.16, 1];
+    const PROF = { pistol: [1700, 0.12, 0.7], pistol45: [1250, 0.17, 1.05], smg: [1900, 0.1, 0.8], smg2: [2100, 0.08, 0.7], ar: [1400, 0.16, 1], battle: [1050, 0.2, 1.2], shotgun: [700, 0.3, 1.5], dmr: [600, 0.45, 1.6], sniper: [450, 0.65, 1.9] };
+    const p = PROF[weapon] ?? PROF[classOf(weapon)] ?? [1200, 0.16, 1];
     const d = local ? 0 : this.dist(pos), far = Math.min(1, d / 180), P = local ? null : pos;
     const v = local ? 0.55 : 0.95;
     this.burst({ freq: 4200 * (1 - far * 0.85), len: 0.035, vol: v * 0.9 * (1 - far * 0.7), type: 'highpass', pos: P });

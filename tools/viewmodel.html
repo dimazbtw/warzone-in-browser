@@ -1,0 +1,24 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script></head><body>
+<script type="module">
+// Primeira pessoa por arma, sem partida: ?w=rifle,sidearm&ads=0|1  (grade 3 colunas)
+import * as THREE from 'three';
+import { assets } from '../client/assets/AssetManager.js';
+import { ViewModel } from '../client/render/ViewModel.js';
+const q = new URLSearchParams(location.search), ids = (q.get('w') ?? 'rifle').split(','), ads = q.get('ads') === '1';
+const W = +(q.get('W') ?? 480), H = Math.round(W * 9 / 16), cols = +(q.get('cols') ?? 3), rows = Math.ceil(ids.length / cols);
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(W * cols, H * rows); r.setScissorTest(true); r.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(r.domElement);
+await assets.wait(60000);
+ids.forEach((id, i) => {
+  const s = new THREE.Scene(); s.background = new THREE.Color(0x8a9aa8);
+  s.add(new THREE.HemisphereLight(0xfff4e0, 0x404a55, 2.2)); const d = new THREE.DirectionalLight(0xffe6c8, 2.2); d.position.set(-2, 4, 3); s.add(d);
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(50, 50), new THREE.MeshStandardMaterial({ color: 0x6b6040 })); ground.rotation.x = -Math.PI / 2; ground.position.y = -1.6; s.add(ground);
+  const cam = new THREE.PerspectiveCamera(70, W / H, 0.01, 100); s.add(cam);
+  const vm = new ViewModel(cam); vm.setWeapon(id); vm.drawT = 1;
+  for (let k = 0; k < 90; k++) vm.update(1 / 60, { ads, sprint: false, moving: false, visible: true });
+  const dz = new THREE.Vector3(0, 0, -1).transformDirection(vm.gun.matrixWorld); vm.root.updateMatrixWorld(true);
+  console.log(id, 'pos', vm.root.position.toArray().map(v => v.toFixed(3)).join(','), 'rot', [vm.root.rotation.x, vm.root.rotation.y, vm.root.rotation.z].map(v => v.toFixed(3)).join(','), 'muzzleDir', new THREE.Vector3(0, 0, -1).transformDirection(vm.gun.matrixWorld).toArray().map(v => v.toFixed(2)).join(','));
+  const x = (i % cols) * W, y = (rows - 1 - Math.floor(i / cols)) * H; r.setViewport(x, y, W, H); r.setScissor(x, y, W, H); r.render(s, cam);
+});
+window.ready = true;
+</script></body></html>

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { gunModel, armsModel, OPERATOR_STYLES } from './Models.js';
+import { gunModel, armsModel, OPERATOR_STYLES, classOf } from './Models.js';
 import { realGun, hasRealGun } from './RealWeapons.js';
+import { assets } from '../assets/AssetManager.js';
 
 /**
  * ViewModel — arma + braços em primeira pessoa.
@@ -8,12 +9,57 @@ import { realGun, hasRealGun } from './RealWeapons.js';
  *   - recuo com mola (posição + rotação), sway do mouse, bob do passo
  *   - animações: sacar, recarga (3 fases), placa, cura, reviver, sprint, slide, pouso
  */
+/**
+ * Braço real de 1ª pessoa (GLB enviado pelo usuário: braço direito, mão aberta, mão na ponta -Z).
+ * Normalizado: origem no centro da palma, braço estendendo para +Z (como o procedural), ~0,72 m.
+ * O esquerdo é o mesmo modelo espelhado em X.
+ */
+let armTpl;
+function realArm() {
+  if (armTpl === undefined) {
+    const g = assets.get('arms'); if (!g) return null;
+    const src = g.scene.clone(true); src.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(src), sz = box.getSize(new THREE.Vector3()), len = sz.z;
+    // centro da palma: média dos vértices nos 8% da ponta -Z
+    const palm = new THREE.Vector3(), v = new THREE.Vector3(); let n = 0;
+    src.traverse(o => { if (!o.isMesh) return; const p = o.geometry.attributes.position; for (let i = 0; i < p.count; i += 3) { v.fromBufferAttribute(p, i).applyMatrix4(o.matrixWorld); if (v.z < box.min.z + len * 0.08) { palm.add(v); n++; } } });
+    palm.divideScalar(Math.max(1, n));
+    const k = 0.72 / len, inner = new THREE.Group(); inner.add(src); src.position.sub(palm); inner.scale.setScalar(k);
+    src.traverse(o => { if (o.isMesh) { o.frustumCulled = false; o.material = o.material.clone(); o.material.roughness = Math.max(0.55, o.material.roughness ?? 1); } });
+    armTpl = inner;
+  }
+  return armTpl.clone(true);
+}
+/** Braços reais: mesmos pontos/rotações do procedural (a mão fica na origem de cada grupo). */
+function realArms(pose) {
+  const g = new THREE.Group();
+  const mk = (x, y, z, rx, ry, rz, roll, mirror) => {
+    const a = new THREE.Group(), m = realArm(); if (!m) return null;
+    m.rotation.z = roll; if (mirror) m.scale.x *= -1;
+    a.add(m); a.position.set(x, y, z); a.rotation.set(rx, ry, rz); g.add(a); return a;
+  };
+  if (!mk(...pose.right)) return null;
+  g.userData.left = mk(...pose.left);
+  return g;
+}
+// [x, y, z, rx, ry, rz, roll da mão, espelhar] — mão direita no punho, esquerda sob o guarda-mão
+const ARM_POSE = {
+  // palma do modelo olha para -Y com roll 0 → direita: roll -π/2 (palma contra a lateral do punho);
+  // esquerda (espelhada): roll π (palma para cima, sob o guarda-mão). rx/ry levam o antebraço para trás e para baixo.
+  long:   { right: [0.035, -0.055, 0.03, 0.42, 0.34, 0, -Math.PI / 2, false], left: [0.012, -0.06, -0.36, 0.12, -0.32, 0, Math.PI, true] },
+  pistol: { right: [0.03, -0.1, 0.03, 0.5, 0.34, 0, -Math.PI / 2, false], left: [-0.01, -0.14, 0.04, 0.55, -0.45, 0, Math.PI, true] },
+};
+
+const VM_FOV = 50;
 const spring = (s, target, k, d, dt) => { const a = (target - s.x) * k - s.v * d; s.v += a * dt; s.x += s.v * dt; return s.x; };
 const smooth = t => t * t * (3 - 2 * t);
 
 export class ViewModel {
   constructor(camera) {
-    this.root = new THREE.Group(); this.root.scale.setScalar(0.62); camera.add(this.root);
+    // espaço do viewmodel: escala X/Y = tan(FOV da câmera/2) / tan(FOV da arma/2) → a arma é projetada como
+    // se tivesse o próprio FOV (50°), sem a distorção de perspectiva do FOV largo do jogo
+    this.camera = camera; this.space = new THREE.Group(); camera.add(this.space);
+    this.root = new THREE.Group(); this.root.scale.setScalar(0.62); this.space.add(this.root);
     this.gun = null; this.arms = null; this.left = null; this.leftRest = new THREE.Vector3(); this.leftRot = new THREE.Euler();
     this.weaponId = null; this.swayX = 0; this.swayY = 0; this.bob = 0; this.t = 0;
     this.kz = { x: 0, v: 0 }; this.kr = { x: 0, v: 0 }; this.ky = { x: 0, v: 0 }; this.land = { x: 0, v: 0 };
@@ -29,18 +75,21 @@ export class ViewModel {
     if (id === this.weaponId && style === this.style && !upgrade) return;
     this.weaponId = id; this.style = style; this.root.clear(); this.gun = null;
     if (!id) return;
-    const gun = realGun(id) || gunModel(id), arms = armsModel(style);
+    const pistolCls = classOf(id) === 'pistol', real = realArms(pistolCls ? ARM_POSE.pistol : ARM_POSE.long);
+    const gun = realGun(id) || gunModel(id), arms = real || armsModel(style);
     const left = arms.userData.left;
-    left.position.z = id === 'sidearm' ? -0.02 : -Math.min(0.42, gun.userData.L * 0.5);
-    if (id === 'sidearm') { left.position.set(-0.03, -0.12, -0.02); left.rotation.set(0.3, -0.2, -0.9); }
+    const pistol = pistolCls;
+    if (!real) left.position.z = pistol ? -0.02 : -Math.min(0.42, gun.userData.L * 0.5);
+    else if (!pistol) left.position.z = -Math.min(0.5, gun.userData.L * 0.42);   // apoio no guarda-mão, conforme o tamanho da arma
+    if (!real && pistol) { left.position.set(-0.03, -0.12, -0.02); left.rotation.set(0.3, -0.2, -0.9); }
     this.leftRest.copy(left.position); this.leftRot.copy(left.rotation);
     this.flash.position.set(0, 0.02, gun.userData.muzzleZ - 0.05); this.light.position.copy(this.flash.position);
     this.root.add(gun, arms, this.flash, this.light); this.flash.visible = false;
     this.gun = gun; this.arms = arms; this.left = left; this.drawT = 0;
     // ADS: sobe a arma até a linha de visada (topo do modelo) ficar exatamente no centro da tela
     this.root.remove(gun); gun.updateMatrixWorld(true);                       // caixa no espaço da própria arma
-    const bb = new THREE.Box3().setFromObject(gun), sightY = (bb.max.y - 0.012) * this.root.scale.y; this.root.add(gun);
-    this.aimPos = [0, -sightY, id === 'sidearm' ? -0.36 : -0.27];
+    const bb = new THREE.Box3().setFromObject(gun), sightY = (bb.max.y - 0.004) * this.root.scale.y; this.root.add(gun);
+    this.aimPos = [0, -sightY, pistol ? -0.36 : -0.37];
   }
   fire(recoil = 1) {
     this.kz.v += 1.6 * recoil; this.kr.v += 9 * recoil; this.ky.v += (Math.random() - 0.5) * 3 * recoil; this.fireRoll = (Math.random() - 0.5) * 0.04 * recoil;
@@ -51,8 +100,12 @@ export class ViewModel {
   /** Impacto de pouso (velocidade vertical em m/s). */
   landed(speed) { this.land.v -= Math.min(4, speed * 0.25); }
 
+  fovCompensate() {
+    const k = Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) / Math.tan(THREE.MathUtils.degToRad(VM_FOV) / 2);
+    this.space.scale.set(k, k, 1);
+  }
   update(dt, { ads, sprint, moving, speed = 0, slide, grounded = true, action, actionTime = 1, mouseDX = 0, mouseDY = 0, visible, sniperScope }) {
-    this.t += dt;
+    this.t += dt; this.fovCompensate();
     this.root.visible = visible && !sniperScope && !!this.gun;
     this.flashT -= dt; this.flash.visible = this.flashT > 0; this.light.intensity = this.flashT > 0 ? 6 : 0;
     const a = Math.min(1, dt * 12);
@@ -75,7 +128,7 @@ export class ViewModel {
     const breathe = Math.sin(this.t * 1.6) * 0.003 * (1 - this.adsK * 0.7);
 
     // pose-base: quadril ↔ mira ↔ sprint
-    const hip = [0.22, -0.22, -0.4], aim = this.aimPos ?? [0, -0.115, -0.3], spr = [0.2, -0.3, -0.32];
+    const hip = [0.155, -0.1, -0.36], aim = this.aimPos ?? [0, -0.115, -0.3], spr = [0.14, -0.15, -0.34];
     const px = hip[0] + (aim[0] - hip[0]) * this.adsK + (spr[0] - hip[0]) * this.sprintK;
     const py = hip[1] + (aim[1] - hip[1]) * this.adsK + (spr[1] - hip[1]) * this.sprintK;
     const pz = hip[2] + (aim[2] - hip[2]) * this.adsK + (spr[2] - hip[2]) * this.sprintK;

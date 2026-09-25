@@ -1,0 +1,23 @@
+<!doctype html><html><head><meta charset="utf-8"><style>body{margin:0;background:#556}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script></head><body>
+<script type="module">
+// Confere a normalização das armas (vista de lado): cano deve apontar para a DIREITA (-Z), topo para cima,
+// ponto vermelho = origem (linha do cano sobre a empunhadura). ?view=side|top
+import * as THREE from 'three';
+import { assets } from '../client/assets/AssetManager.js';
+import { realGun, WEAPON_MODELS } from '../client/render/RealWeapons.js';
+const ids = Object.keys(WEAPON_MODELS), W = 350, H = 230, cols = 4, rows = Math.ceil(ids.length / cols), view = new URLSearchParams(location.search).get('view') ?? 'side';
+const r = new THREE.WebGLRenderer({ antialias: true }); r.setSize(W * cols, H * rows); r.setScissorTest(true); r.outputColorSpace = THREE.SRGBColorSpace; document.body.appendChild(r.domElement);
+await assets.wait(60000);
+ids.forEach((id, i) => {
+  const s = new THREE.Scene(); s.background = new THREE.Color(i % 2 ? 0x5a6070 : 0x646a7a);
+  s.add(new THREE.HemisphereLight(0xffffff, 0x445566, 2.4)); const d = new THREE.DirectionalLight(0xffffff, 2); d.position.set(3, 4, 2); s.add(d);
+  const g = realGun(id); if (!g) return; s.add(g);
+  const dot = new THREE.Mesh(new THREE.SphereGeometry(g.userData.L * 0.02), new THREE.MeshBasicMaterial({ color: 0xff0000, depthTest: false })); dot.renderOrder = 9; s.add(dot);
+  const L = g.userData.L, cam = new THREE.PerspectiveCamera(30, W / H, 0.01, 50);
+  if (view === 'top') { cam.position.set(0, L * 2.4, -L * 0.1); cam.up.set(1, 0, 0); } else cam.position.set(L * 2.4, 0, -L * 0.1);
+  cam.lookAt(0, 0, -L * 0.1);
+  const x = (i % cols) * W, y = (rows - 1 - Math.floor(i / cols)) * H; r.setViewport(x, y, W, H); r.setScissor(x, y, W, H); r.render(s, cam);
+});
+window.ready = true;
+</script></body></html>

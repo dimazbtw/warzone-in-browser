@@ -44,7 +44,8 @@ export class LootSystem {
   /** Arma primária aleatória com raridade (a raridade vira acessórios no WeaponSystem). */
   rollWeapon(boost = 0) {
     const { cfg, rng } = this.ctx, rarity = this.rollRarity(boost);
-    const pool = Object.entries(cfg.weapons).filter(([, w]) => w.slot === 'primary');
+    // primárias sempre; pistolas também aparecem, com menos frequência
+    const pool = Object.entries(cfg.weapons).filter(([, w]) => w.slot === 'primary' || rng() < 0.35);
     const [id, w] = rng.pick(pool);
     const mag = Math.round(w.mag * (cfg.rarity?.[rarity]?.mag ?? 1));
     return { type: 'weapon', data: { id, mag, rarity }, rarity };

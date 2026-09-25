@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { V, C, Q, M4 } from './pool.js';
+import { classOf } from '../Models.js';
 
 /**
  * Animator — animação procedural por IK para qualquer humanoide mapeado no Rig.
@@ -26,6 +27,9 @@ export const GRIPS = {
   marksman:{ grip: [0, -0.06, 0.12], support: [0, -0.03, -0.38], shoulder: 0.3 },
   sidearm: { grip: [0, -0.085, 0.0], support: [-0.035, -0.09, 0.025], shoulder: 0.42 },
 };
+
+const GRIP_BY_CLASS = { pistol: 'sidearm', smg: 'smg', ar: 'rifle', shotgun: 'shotgun', dmr: 'marksman', sniper: 'marksman' };
+const gripKind = id => (id && GRIPS[id] ? id : GRIP_BY_CLASS[classOf(id)] ?? 'rifle');
 
 export class Animator {
   constructor(rig, weaponHolder) {
@@ -109,7 +113,7 @@ export class Animator {
     rig.rotateWorld(b.head, R, aimPitch * 0.12 + K.prone * 0.35 + K.freefall * 0.4);
 
     // ---------- arma ----------
-    const kind = s.weapon && GRIPS[s.weapon] ? s.weapon : 'rifle', G = GRIPS[kind], pistol = kind === 'sidearm';
+    const kind = gripKind(s.weapon), G = GRIPS[kind], pistol = kind === 'sidearm';
     const chest = b.spine2.getWorldPosition(_v()), head = b.head.getWorldPosition(_v());
     const bodyUp = C(UP).applyAxisAngle(R, pitchBody), bodyF = C(F).applyAxisAngle(R, pitchBody);
     // direção da arma: mira (com pitch) → sprint (atravessada) → tático (para cima) → baixa (ações)
