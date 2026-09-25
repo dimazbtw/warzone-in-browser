@@ -26,7 +26,7 @@ export const KEY_LABELS = {
   forward: 'Frente', back: 'Trás', left: 'Esquerda', right: 'Direita', sprint: 'Correr', crouch: 'Agachar / cortar paraquedas', prone: 'Deitar (prone)',
   jump: 'Pular / mantle / abrir paraquedas', interact: 'Pegar / abrir baú / segurar p/ reviver', reload: 'Recarregar',
   primary: 'Arma 1', secondary: 'Arma 2', knife: 'Faca na mão', plate: 'Placas de armadura (aplica até cancelar)', heal: 'Adrenalina (cura)',
-  lethal: 'Granada', tactical: 'Granada de fumaça', melee: 'Faca (equipa / golpeia / finaliza)', ping: 'Marcar (ping) · botão do meio',
+  lethal: 'Granada', tactical: 'Granada de fumaça', melee: 'Golpe de faca (toque) · segurar equipa a faca', ping: 'Marcar (ping) · botão do meio',
   contract: 'Aceitar contrato', shop: 'Estação de compra', map: 'Mapa', inventory: 'Inventário / placar',
   specNext: 'Espectador: próximo', specPrev: 'Espectador: anterior',
 };
@@ -63,7 +63,9 @@ export class InputSystem extends EventTarget {
     this.zoomScale = 1;
   }
   emit(type, detail) { this.dispatchEvent(new CustomEvent(type, { detail })); }
-  on(type, fn) { this.addEventListener(type, e => fn(e.detail)); }
+  on(type, fn) { const w = fn.__w ??= e => fn(e.detail); this.addEventListener(type, w); }
+  /** Remove um ouvinte registrado com on() (o wrapper fica guardado na função). */
+  off(type, fn) { if (fn?.__w) this.removeEventListener(type, fn.__w); }
   /** Reconstrói o índice tecla → ação (após o jogador remapear). */
   rebind() { applyBindings(); this.byCode = new Map(); for (const [action, keys] of Object.entries(KEYMAP)) for (const k of [].concat(keys)) this.byCode.set(k, action); }
   down(action) { for (const k of [].concat(KEYMAP[action])) if (this.keys.has(k)) return true; return false; }

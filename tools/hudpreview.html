@@ -1,0 +1,26 @@
+<!doctype html><html lang="pt-BR"><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&family=Barlow+Condensed:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="../client/style.css">
+<style>body{background:#222 url('../assets/ui/squad_3.jpg') center/cover}</style>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script></head><body>
+<script type="module">
+// Prévia do HUD com estado simulado (sem partida): para iterar no visual rapidamente.
+import { makeConfig } from '../shared/config.js';
+const html = await (await fetch('../index.html')).text();
+const hudHtml = html.slice(html.indexOf('<div id="hud"'), html.indexOf('<!-- ======================= PAUSA'));
+document.body.insertAdjacentHTML('beforeend', hudHtml);
+const { HUDSystem } = await import('../client/ui/HUDSystem.js');
+const hud = new HUDSystem(); hud.show(true);
+hud.drawMap = (ctx, size) => { ctx.fillStyle = '#5b6448'; ctx.fillRect(0, 0, size, size); ctx.fillStyle = '#8a8f7a'; for (let i = 0; i < 26; i++) ctx.fillRect((i * 53) % size, (i * 97) % size, 14, 10); ctx.fillStyle = '#e8b13a'; ctx.beginPath(); ctx.moveTo(size / 2, size / 2 - 7); ctx.lineTo(size / 2 + 5, size / 2 + 5); ctx.lineTo(size / 2 - 5, size / 2 + 5); ctx.fill(); };
+const cfg = makeConfig({});
+const you = { s: 'alive', hp: 72, ar: 110, stam: 80, y: 0, zone: { outside: -40, bearing: 0 }, stats: { kills: 3 }, radar: 0,
+  inv: { primary: { id: 'battle', rarity: 'epic', mag: 24 }, secondary: { id: 'sniper', rarity: 'rare', mag: 5 }, active: 'primary', ammo: { rifle: 150, pistol: 40, sniper: 15, shell: 0 }, plates: 6, heals: 2, lethal: 2, tactical: 1, cash: 10000 },
+  contract: { type: 'scavenger', name: 'Saqueador', progress: 0, goal: 3, timeLeft: 90 } };
+const snap = { you, match: { alive: 40, squadsLeft: 11, resurgence: true }, zone: { t: 90, phase: 1, total: 6, state: 'waiting', dps: 4, x: 0, z: 0, r: 200, to: { x: 0, z: 0, r: 120 } },
+  squad: [{ name: 'Aurora', state: 'alive', hp: 100, armor: 150, dist: 12, connected: true }, { name: 'Bento', state: 'alive', hp: 60, armor: 50, dist: 30, connected: true }, { name: 'Caju', state: 'downed', bleed: 60, dist: 55, connected: true }], others: [] };
+const view = { snap, cfg, yaw: -4.45, pos: { x: 0, z: 0 }, mapView: { size: 900, pois: [{ name: 'Alojamentos', x: 5, z: 5 }] }, stations: [], boards: new Map(), myName: 'Jogador', others: [], spread: 6,
+  prompt: `<div class="lc-keys"><span><kbd>E</kbd> TROCAR</span><span><kbd>X</kbd> MARCAR</span></div><div class="lootcard" style="--rc:#b36bff"><img src="../assets/ui/w_rifle.png"><div><b>Carcará AR</b><small>Fuzil de assalto</small><em>Épica</em></div></div>` };
+for (const n of ['Zepa ✖ Lume', 'Raio ✖ Nado38', 'Jogador ✖ Kiko']) hud.killfeed(n, n.startsWith('Jogador'));
+hud.update(view); hud.banner('CONTRATO ACEITO · SAQUEADOR', '⚲');
+setTimeout(() => { hud.update(view); window.ready = true; }, 800);
+</script></body></html>

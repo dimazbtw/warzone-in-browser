@@ -78,7 +78,7 @@ export class World {
     }));
     this.zoneWall.position.y = 100; this.dynamic.add(this.zoneWall);
     this.nextZone = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 60, 96, 1, true), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.1, side: THREE.DoubleSide, depthWrite: false }));
-    this.nextZone.position.y = 20; this.dynamic.add(this.nextZone);
+    this.nextZone.position.y = 20; this.nextZone.visible = false;   // próxima zona só aparece no minimapa
     // estações
     this.stations = payload.stations ?? [];
     for (const s of this.stations) {

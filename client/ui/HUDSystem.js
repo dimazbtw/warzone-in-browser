@@ -1,3 +1,6 @@
+import { ICON } from './Icons.js';
+/** Pasta de imagens da UI (relativa ao módulo, funciona de qualquer página). */
+export const UI_URL = new URL('../../assets/ui/', import.meta.url).href;
 import { KEYMAP, keyName } from '../game/InputSystem.js';
 /**
  * HUDSystem — toda a interface em DOM/canvas 2D, alimentada só por snapshots/eventos.
@@ -56,8 +59,8 @@ export class HUDSystem {
       const def = cfg.weapons[w.id], R = cfg.rarity?.[w.rarity] ?? {};
       return `<div class="inv-slot" style="border-left-color:${rarColor[w.rarity] ?? '#888'}"><small>${label}${inv.active === k ? ' · EM MÃOS' : ''}</small><b>${def.name}</b> <span style="color:${rarColor[w.rarity]}">${R.label ?? w.rarity}</span><small>${w.mag} no pente · ${inv.ammo?.[def.ammo] ?? 0} reserva · dano ×${(R.damage ?? 1).toFixed(2)} · recuo ×${(R.recoil ?? 1).toFixed(2)}</small></div>`; };
     el.innerHTML = `<h3>INVENTÁRIO</h3><div class="inv-grid">${slot('primary', 'PRIMÁRIA')}${slot('secondary', 'SECUNDÁRIA')}
-      <div class="inv-slot"><small>EQUIPAMENTO</small>🛡 ${inv.plates} placas · ✚ ${inv.heals} curas<br>💣 ${inv.lethal} granada · ☁ ${inv.tactical ?? 0} fumaça</div>
-      <div class="inv-slot"><small>DINHEIRO</small><b style="color:var(--green)">$${inv.cash}</b><small>☠ ${you.stats?.kills ?? 0} eliminações</small></div></div>
+      <div class="inv-slot"><small>EQUIPAMENTO</small>${ICON.plate} ${inv.plates} placas · ${ICON.heal} ${inv.heals} curas<br>${ICON.grenade} ${inv.lethal} granada · ${ICON.smoke} ${inv.tactical ?? 0} fumaça</div>
+      <div class="inv-slot"><small>DINHEIRO</small><b style="color:var(--green)">$${inv.cash}</b><small>${ICON.skull} ${you.stats?.kills ?? 0} eliminações</small></div></div>
       <h3 style="margin-top:12px">ESQUADRÃO</h3>${squad.map(m => `<div class="inv-slot" style="margin-top:4px"><b>${m.name}</b> <small>${STATE[m.state] ?? m.state}</small></div>`).join('') || '<small>sozinho</small>'}`;
   }
   /** Faixa grande no centro (contrato aceito etc.), com chevrons amarelos. */
@@ -69,7 +72,7 @@ export class HUDSystem {
   fired() { this.bloom = Math.min(18, (this.bloom ?? 0) + 5); this.magKick = performance.now() + 60; }
   /** Banner de eliminação no centro da tela. */
   killBanner(name, { head = false, finisher = false } = {}) {
-    const el = $('killBanner'); el.innerHTML = `<i>☠</i><div><b>${finisher ? 'FINALIZADO' : head ? 'TIRO NA CABEÇA' : 'ELIMINADO'}</b><span>${name}</span></div>`;
+    const el = $('killBanner'); el.innerHTML = `<i>${ICON.skull}</i><div><b>${finisher ? 'FINALIZADO' : head ? 'TIRO NA CABEÇA' : 'ELIMINADO'}</b><span>${name}</span></div>`;
     el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
   }
   shotPing(x, z) { this.shots.push({ x, z, until: performance.now() + 1500 }); }
@@ -90,10 +93,11 @@ export class HUDSystem {
     const s = v.snap; if (!s) return;
     const y = s.you, now = performance.now();
     // topo
-    $('topright').innerHTML = `<div><i>⛨</i><b>${s.match.squadsLeft}</b></div><div><i>👤</i><b>${s.match.alive}</b></div><div><i>☠</i><b>${y.stats.kills}</b></div>`;
+    const tr = `<div>${ICON.squad}<b>${s.match.squadsLeft}</b></div><div>${ICON.person}<b>${s.match.alive}</b></div><div class="k">${ICON.skull}<b>${y.stats.kills}</b></div>`;
+    if (tr !== this._tr) { $('topright').innerHTML = tr; this._tr = tr; }
     const z = s.zone, zi = y.zone, mm = Math.floor(Math.max(0, z.t) / 60), ss = String(Math.ceil(Math.max(0, z.t)) % 60).padStart(2, '0');
     const bearing = ((zi.bearing * 180 / Math.PI) + 360) % 360;
-    $('zoneInfo').innerHTML = `<div class="zrow"><span class="zt"><em>${z.phase + 1}</em>${mm}:${ss}</span><span class="zt gas ${z.state === 'closing' ? 'on' : ''}"><em>☁</em>${z.state === 'closing' ? 'FECHANDO' : z.state === 'waiting' ? 'ESPERA' : 'FINAL'}</span><span class="zt"><em>♻</em><span class="${s.match.resurgence ? 'ok' : 'off'}">${s.match.resurgence ? 'ATIVO' : 'OFF'}</span></span></div>
+    $('zoneInfo').innerHTML = `<div class="zrow"><span class="zt"><em>${z.phase + 1}</em>${ICON.timer}${mm}:${ss}</span><span class="zt gas ${z.state === 'closing' ? 'on' : ''}">${ICON.storm}${z.state === 'closing' ? 'FECHANDO' : z.state === 'waiting' ? 'PARADA' : 'FINAL'}</span><span class="zt ${s.match.resurgence ? 'ok' : 'off'}">${ICON.resurgence}${s.match.resurgence ? 'RETORNO' : 'OFF'}</span></div>
       ${zi.outside > 0 ? `<div class="zwarn">FORA DA ZONA · ${Math.round(zi.outside)} m ➜ ${Math.round(bearing)}° · ${z.dps}/s</div>` : ''}${y.radar ? '<div class="zwarn radar">📡 RADAR ATIVO</div>' : ''}`;
     // bússola
     const hd = ((-v.yaw * 180 / Math.PI) % 360 + 360) % 360;
@@ -123,18 +127,18 @@ export class HUDSystem {
         ${up || me ? `<div class="bars">${[0, 1, 2].map(i => seg(me ? y.ar : m.armor, i)).join('')}</div><div class="hp ${me && y.hp < 35 && y.s === 'alive' ? 'low' : ''}">${me ? `<b style="width:${this.hpGhost}%"></b>` : ''}<i style="width:${Math.max(0, me ? y.hp : m.hp)}%"></i></div>` : ''}
         ${me ? `<div class="stam"><i style="width:${y.stam}%"></i></div>` : ''}</div>`;
     };
-    const sqHtml = `<div class="sq-cash"><i>$</i><b>$${inv?.cash ?? 0}</b></div>` + s.squad.map((m, k) => member(m, s.squad.length - k + 1, false)).join('') + member({ name: v.myName, state: y.s }, 1, true);
+    const sqHtml = `<div class="sq-cash">${ICON.cash}<b>$${(inv?.cash ?? 0).toLocaleString('pt-BR')}</b></div>` + s.squad.map((m, k) => member(m, s.squad.length - k + 1, false)).join('') + member({ name: v.myName, state: y.s }, 1, true);
     if (sqHtml !== this._sqHtml) { $('squad').innerHTML = sqHtml; this._sqHtml = sqHtml; }
     // equipamentos (placas / cura / letal / tático) — ao lado do squad
-    if (inv) $('equip').innerHTML = `<div class="eq"><b>${inv.plates}</b><small>${keyHint('plate')}</small><span>PLACAS</span></div><div class="eq"><b>${inv.heals}</b><small>${keyHint('heal')}</small><span>CURA</span></div>`;
+    if (inv) { const eq = `<div class="eq">${ICON.plate}<b>${inv.plates}</b>${keyHint('plate')}</div><div class="eq">${ICON.heal}<b>${inv.heals}</b>${keyHint('heal')}</div>`; if (eq !== this._eq) { $('equip').innerHTML = eq; this._eq = eq; } }
     // arma: card com silhueta, nome, raridade, munição grande + reserva; letal/tático acima
     if (inv) {
       const knife = inv.active === 'knife', w = knife ? null : inv[inv.active], def = w && v.cfg.weapons[w.id], other = inv[inv.active === 'primary' ? 'secondary' : 'primary'];
       const R = w && v.cfg.rarity?.[w.rarity], rc = RAR[w?.rarity] ?? '#bbb', res = def ? inv.ammo[def.ammo] : 0, max = def ? Math.round(def.mag * (R?.mag ?? 1)) : 1;
       const low = w && w.mag <= max * 0.25, empty = w && w.mag === 0 && res === 0;
-      const wHtml = `<div class="gear"><div class="g"><i>💣</i><b>${inv.lethal}</b><small>${keyHint('lethal')}</small></div><div class="g"><i>☁</i><b>${inv.tactical ?? 0}</b><small>${keyHint('tactical')}</small></div></div>
+      const wHtml = `<div class="gear"><div class="g">${ICON.grenade}<b>${inv.lethal}</b>${keyHint('lethal')}</div><div class="g">${ICON.smoke}<b>${inv.tactical ?? 0}</b>${keyHint('tactical')}</div></div>
         <div class="wcard" style="--rc:${rc}"><div class="wc-name"><span style="color:${rc}">◆</span> ${knife ? 'FACA DE COMBATE' : def?.name ?? '—'}</div>
-          <div class="wc-body">${knife ? '<div class="wc-knife">🗡</div>' : w ? `<img src="assets/ui/w_${w.id}.png" alt="">` : ''}
+          <div class="wc-body">${knife ? `<div class="wc-knife">${ICON.knife}</div>` : w ? `<img src="${UI_URL}w_${w.id}.png" alt="">` : ''}
           ${knife ? '<div class="wc-ammo"><b>—</b></div>' : `<div class="wc-ammo"><b class="${low ? 'low' : ''} ${this.magKick > now ? 'kick' : ''}">${w?.mag ?? 0}</b><span>${res}</span></div>`}</div>
           <div class="wc-foot"><span class="dots">${'•'.repeat(Math.min(5, Math.ceil((w?.mag ?? 0) / max * 5)))}</span><span class="mode">${def?.auto ? 'AUTO' : knife ? 'CORPO A CORPO' : 'SEMI'}</span><span class="rar" style="color:${rc}">${R?.label ?? ''}</span></div>
           <div class="wc-other">${other ? `${keyHint(inv.active === 'primary' ? 'secondary' : 'primary')} ${v.cfg.weapons[other.id]?.name}` : ''} · ${keyHint('knife')} FACA</div></div>
@@ -173,6 +177,8 @@ export class HUDSystem {
     this.dirs = this.dirs.filter(d => d.until > now);
     $('dmgDirs').innerHTML = this.dirs.map(d => `<i style="transform:rotate(${(d.angle + v.yaw) * -180 / Math.PI}deg);opacity:${(d.until - now) / 700}"></i>`).join('');
     $('scope').classList.toggle('hidden', !v.sniperScope);
+    const br = $('breath'); br.classList.toggle('hidden', !v.breath);
+    if (v.breath) br.innerHTML = `<span>${v.breath.hold ? 'PRENDENDO A RESPIRAÇÃO' : `SEGURE ${keyHint('sprint')} PARA FOCAR`}</span><div><i style="width:${v.breath.left / 5 * 100}%"></i></div>`;
     // mapas
     this.shots = this.shots.filter(p => p.until > now);
     this.drawMap(this.mm, 220, v, v.pos.x, v.pos.z, 1.25, true);
@@ -242,7 +248,7 @@ export class HUDSystem {
 
   scoreboard(show, results) {
     const el = $('scoreboard'); el.classList.toggle('hidden', !show); if (!show) return;
-    el.innerHTML = `<b>PLACAR</b><table>${results.map(r => `<tr><td>${r.name}</td><td>☠ ${r.kills}</td><td>${STATE[r.state] ?? ''}</td></tr>`).join('')}</table>`;
+    el.innerHTML = `<b>PLACAR</b><table>${results.map(r => `<tr><td>${r.name}</td><td>${ICON.skull} ${r.kills}</td><td>${STATE[r.state] ?? ''}</td></tr>`).join('')}</table>`;
   }
 
   end(e, myId, mySquad) {

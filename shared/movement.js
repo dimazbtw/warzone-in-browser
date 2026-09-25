@@ -60,7 +60,12 @@ export function stepGround(b, input, dt, now, cfg, geo, opts = {}) {
     b.pos.x = mt.sx + (mt.tx - mt.sx) * e; b.pos.z = mt.sz + (mt.tz - mt.sz) * e;
     b.pos.y = mt.sy + (mt.ty - mt.sy) * Math.min(1, e * 1.6) + (mt.vault ? Math.sin(e * Math.PI) * 0.4 : 0);
     b.vel.x = b.vel.y = b.vel.z = 0;
-    if (k >= 1) { b.mantle = null; b.grounded = true; b.pos.y = geo.groundHeight(b.pos.x, b.pos.z, b.pos.y + 0.05); ev[mt.vault ? 'vaulted' : 'mantled'] = true; }
+    if (k >= 1) {
+      b.mantle = null; ev[mt.vault ? 'vaulted' : 'mantled'] = true;
+      // nunca "teleporta" para baixo: sem piso logo abaixo, cai com gravidade a partir de onde está
+      const g = geo.groundHeight(b.pos.x, b.pos.z, b.pos.y + 0.05);
+      if (g >= b.pos.y - 0.35) { b.pos.y = g; b.grounded = true; } else b.grounded = false;
+    }
     return ev;
   }
 
@@ -84,9 +89,13 @@ export function stepGround(b, input, dt, now, cfg, geo, opts = {}) {
         const thick = geo.thickness(ob.box, ob.x, ob.z, fwd.x, fwd.z);
         if (dh <= M.mantle.vaultMaxHeight && thick <= M.mantle.vaultMaxThickness) {
           const tx = ob.x + fwd.x * (thick + 0.55), tz = ob.z + fwd.z * (thick + 0.55), ty = geo.groundHeight(tx, tz, top + 0.1);
-          if (ty <= top && geo.clearAt(tx, ty, tz)) { startMantle(b, { x: tx, z: tz }, ty, true, M, fwd); return ev; }
+          // só pula por cima se o outro lado estiver quase na mesma altura: mureta na borda de um telhado
+          // tem o vazio do outro lado, e o "vault" levava o jogador ao chão em 0,25 s (parecia teleporte)
+          if (ty <= top && ty >= b.pos.y - (M.mantle.vaultMaxDrop ?? 1.2) && geo.clearAt(tx, ty, tz)) { startMantle(b, { x: tx, z: tz }, ty, true, M, fwd); return ev; }
         }
-        const tx = ob.x + fwd.x * 0.45, tz = ob.z + fwd.z * 0.45;
+        // ponto de chegada EM CIMA do obstáculo (em muretas finas, no meio da espessura — antes caía no vazio do outro lado)
+        const thickTop = geo.thickness(ob.box, ob.x, ob.z, fwd.x, fwd.z), into = Math.min(0.45, Math.max(0.05, thickTop / 2));
+        const tx = ob.x + fwd.x * into, tz = ob.z + fwd.z * into;
         if (geo.clearAt(tx, top, tz, 0.3)) { startMantle(b, { x: tx, z: tz }, top, false, M, fwd); return ev; }
       } else if (ob.box.climb) { b.climb = { top, x: ob.x + fwd.x * 0.45, z: ob.z + fwd.z * 0.45 }; b.slide = null; return ev; }
     }

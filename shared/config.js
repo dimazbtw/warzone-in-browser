@@ -90,12 +90,13 @@ export const CONFIG = {
   zone: {
     startRadiusFactor: 1.45,    // multiplica o meio-mapa
     phases: [
-      { radius: 150, wait: 45, close: 40, dps: 2 },
-      { radius: 100, wait: 40, close: 35, dps: 4 },
-      { radius: 65,  wait: 35, close: 30, dps: 7 },
-      { radius: 38,  wait: 30, close: 25, dps: 11 },
-      { radius: 18,  wait: 25, close: 22, dps: 16 },
-      { radius: 0,   wait: 15, close: 20, dps: 25 }, // fase final força confronto
+      // fechamento lento (a tempestade avança devagar; dá tempo de rotacionar)
+      { radius: 150, wait: 45, close: 75, dps: 2 },
+      { radius: 100, wait: 40, close: 65, dps: 4 },
+      { radius: 65,  wait: 35, close: 55, dps: 7 },
+      { radius: 38,  wait: 30, close: 45, dps: 11 },
+      { radius: 18,  wait: 25, close: 40, dps: 16 },
+      { radius: 0,   wait: 15, close: 35, dps: 25 }, // fase final força confronto
     ],
     centerBias: 0.85,           // quão longe do centro atual o novo pode cair (0..1)
   },

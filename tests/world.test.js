@@ -76,3 +76,19 @@ test('partida completa com bots no mapa real termina com vencedor', () => {
   assert.ok(ended, 'terminou'); assert.ok(ended.winnerSquad);
   assert.ok(kills >= 3, `bots eliminaram ${kills}`);
 });
+
+test('mureta na borda do telhado: sobe nela (mantle), não "teleporta" para o chão com vault', () => {
+  const cfg = makeConfig({});
+  const geo = new MapGeometry(400, [
+    { minX: -10, maxX: 10, minZ: -10, maxZ: 0, y0: 0, y1: 9, kind: 'building' },
+    { minX: -10, maxX: 10, minZ: -10.2, maxZ: -10, y0: 9, y1: 10, kind: 'wall' },
+  ]);
+  const b = newBody(); b.pos.x = 0; b.pos.z = -8.5; b.pos.y = 9; b.grounded = true;
+  let minY = 99;
+  for (let i = 0; i < 45; i++) {
+    stepGround(b, { mx: 0, mz: i < 40 ? -1 : 0, yaw: 0, jump: i === 30 }, 1 / 30, i / 30, cfg, geo, {});
+    if (b.mantle) assert.ok(!b.mantle.vault && b.mantle.ty > 9, 'deveria subir na mureta');
+    minY = Math.min(minY, b.pos.y);
+  }
+  assert.ok(minY > 8.5, `caiu até ${minY.toFixed(2)}`);
+});

@@ -3,6 +3,7 @@ import { C2S } from '../../shared/protocol.js';
 import { MapGeometry } from '../../shared/geometry.js';
 import { weaponWeight } from '../../shared/movement.js';
 import { KEYMAP, keyName } from './InputSystem.js';
+import { UI_URL } from '../ui/HUDSystem.js';
 const keyHint = action => { const k = [].concat(KEYMAP[action] ?? [])[0]; return k ? `<kbd>${keyName(k)}</kbd>` : ''; };
 import { Prediction } from './Prediction.js';
 import { Interpolation } from './Interpolation.js';
@@ -46,7 +47,7 @@ export class GameSession {
     this.onAction = a => this.action(a);
     this.onSwap = () => { const inv = this.snap?.you.inv; if (inv) this.net.send(C2S.SWITCH, { slot: inv.active === 'primary' ? 'secondary' : 'primary' }); };
     this.onFireDown = () => this.tryFire(true);
-    this.input.on('action', this.onAction); this.input.on('swap', this.onSwap); this.input.on('fireDown', this.onFireDown);
+    this.input.on('action', this.onAction); this.onRelease = a => { if (a === 'melee') this.onMeleeRelease(); }; this.input.on('release', this.onRelease); this.input.on('swap', this.onSwap); this.input.on('fireDown', this.onFireDown);
     this.shopClick = e => { const it = e.target.closest('[data-item]'); if (it) this.net.send(C2S.BUY, { stationId: $('shop').dataset.station, item: it.dataset.item, targetId: it.dataset.target }); };
     $('shop').addEventListener('click', this.shopClick);
     this.keyTab = e => {
@@ -205,10 +206,8 @@ export class GameSession {
       case 'lethal': n.send(C2S.THROW, { yaw: i.yaw, pitch: i.pitch }); break;
       case 'tactical': n.send(C2S.TACTICAL, { yaw: i.yaw, pitch: i.pitch }); break;
       case 'knife': n.send(C2S.SWITCH, { slot: 'knife' }); break;
-      case 'melee':   // V: equipa a faca; com a faca na mão, golpeia
-        if (this.snap.you.inv?.active !== 'knife') n.send(C2S.SWITCH, { slot: 'knife' });
-        else { n.send(C2S.MELEE, { yaw: i.yaw }); this.vm.melee(); this.audio.whoosh(); }
-        break;
+      case 'melee':   // V: toque = golpe rápido; segurar (settings.knifeHold s) = equipa a faca
+        this.meleeHeldAt = performance.now(); this.meleeEquipped = false; break;
       case 'ping': this.sendPing(); break;
       case 'interact': { const c = this.nearestChest(), it = this.nearestLoot(); if (c && (!it || c.d < it.d)) n.send(C2S.CHEST, { chestId: c.id }); else if (it) n.send(C2S.PICKUP, { lootId: it.id }); break; }
       case 'contract': { const b = this.nearBoard(); if (b) n.send(C2S.CONTRACT, { boardId: b.id }); else this.hud.notify('Nenhum tablet de contrato por perto', 1.5); break; }
@@ -217,6 +216,27 @@ export class GameSession {
       case 'specNext': n.send(C2S.SPECTATE, { dir: 1 }); break;
       case 'specPrev': n.send(C2S.SPECTATE, { dir: -1 }); break;
     }
+  }
+  /**
+   * Balanço da luneta (sniper/DMR mirando): a mira "respira" em figura de oito.
+   * Shift segura a respiração (quase para) por até 5 s; depois treme até soltar e recuperar.
+   */
+  updateSway(dt, scoped) {
+    const S = this.sway ??= { y: 0, p: 0, t: 0, breath: 5, hold: false, k: 0 };
+    S.k += ((scoped ? 1 : 0) - S.k) * Math.min(1, dt * 6);
+    const holding = scoped && this.input.down('sprint') && S.breath > 0;
+    if (holding) S.breath = Math.max(0, S.breath - dt); else if (!this.input.down('sprint')) S.breath = Math.min(5, S.breath + dt * 1.2);
+    const exhausted = scoped && this.input.down('sprint') && S.breath <= 0;
+    S.hold = holding; S.t += dt;
+    const amp = 0.011 * S.k * (holding ? 0.07 : exhausted ? 1.8 : 1) * (this.pred.body.stance === 'prone' ? 0.45 : this.pred.body.stance === 'crouch' ? 0.75 : 1);
+    const ty = (Math.sin(S.t * 0.9) + Math.sin(S.t * 2.3 + 1.2) * 0.35) * amp, tp = (Math.sin(S.t * 1.8 + 0.6) * 0.6 + Math.sin(S.t * 3.1) * 0.2) * amp;
+    const f = Math.min(1, dt * (holding ? 3 : 6)); S.y += (ty - S.y) * f; S.p += (tp - S.p) * f;
+  }
+  /** Soltou o V: se foi um toque, golpe rápido (a arma continua na mão). */
+  onMeleeRelease() {
+    if (this.meleeHeldAt == null || !this.inMatch) return;
+    const held = (performance.now() - this.meleeHeldAt) / 1000; this.meleeHeldAt = null;
+    if (!this.meleeEquipped && held < (settings.get('knifeHold') ?? 3)) { this.net.send(C2S.MELEE, { yaw: this.input.yaw }); this.vm.melee(); this.audio.whoosh(); }
   }
   nearestLoot() {
     const p = this.pred.body.pos; let best = null, bd = this.cfg.loot.pickupRange;
@@ -251,7 +271,7 @@ export class GameSession {
     if (now < this.nextFire || y.action?.type === 'plate' || y.action?.type === 'revive') return;
     if (w.mag - this.shotsSinceSnap <= 0) { if (click) { this.audio.tone(220, 0.04, 0.05); this.net.send(C2S.RELOAD); } return; }
     this.nextFire = now + 60 / def.rpm; this.shotsSinceSnap++;
-    this.net.send(C2S.FIRE, { yaw: this.input.yaw, pitch: this.input.pitch });
+    this.net.send(C2S.FIRE, { yaw: this.input.yaw + (this.sway?.y ?? 0), pitch: this.input.pitch + (this.sway?.p ?? 0) });   // o tiro sai para onde a luneta aponta (com o balanço)
     this.vm.fire(def.recoil); this.audio.shot(w.id, null, true); this.hud.fired();
     const cam = this.world.camera, o = cam.getWorldPosition(new THREE.Vector3()), d = cam.getWorldDirection(new THREE.Vector3());
     const wall = this.geo.raycast(o, d, def.range), end = o.clone().addScaledVector(d, wall ?? def.range);
@@ -283,6 +303,9 @@ export class GameSession {
     // recuperação do recuo: devolve parte da subida acumulada quando para de atirar
     if (this.recoilDebt > 0 && !input.fire) { const r = Math.min(this.recoilDebt, dt * 1.6 * Math.max(0.05, this.recoilDebt * 6)); input.pitch -= r; this.recoilDebt -= r; }
     if (input.fire) this.tryFire(false);
+    if (this.meleeHeldAt != null && !this.meleeEquipped && (performance.now() - this.meleeHeldAt) / 1000 >= (settings.get('knifeHold') ?? 3)) {
+      this.meleeEquipped = true; this.net.send(C2S.SWITCH, { slot: 'knife' }); this.hud.notify('FACA EQUIPADA', 1);
+    }
 
     const others = this.interp.sample(serverNow);
     this.avatars.update(others, dt, this.world.camera.position);
@@ -323,7 +346,8 @@ export class GameSession {
       this.landDip = (this.landDip ?? 0) * Math.max(0, 1 - dt * 7); this.camKick = (this.camKick ?? 0) * Math.max(0, 1 - dt * 14);
       this.eyeS = (this.eyeS ?? eye) + (eye - (this.eyeS ?? eye)) * Math.min(1, dt * 12);   // agachar/levantar suave
       cam.position.set(pos.x + Math.cos(input.yaw) * Math.sin(this.bobT * 0.5) * bobA * 0.6, pos.y + this.eyeS - Math.abs(Math.sin(this.bobT)) * bobA - this.landDip, pos.z - Math.sin(input.yaw) * Math.sin(this.bobT * 0.5) * bobA * 0.6);
-      cam.rotation.set(input.pitch + this.camKick, input.yaw, this.roll, 'YXZ');
+      this.updateSway(dt, aim && !!this.cfg.weapons[w?.id]?.scope && st === 'alive');
+      cam.rotation.set(input.pitch + this.camKick + this.sway.p, input.yaw + this.sway.y, this.roll, 'YXZ');
       // passos locais
       if (moving && body.stance !== 'prone') { this.stepAcc = (this.stepAcc ?? 0) + sp * dt; const stride = body.sprinting ? 2.4 : 1.9; if (this.stepAcc > stride) { this.stepAcc = 0; this.audio.step(null, body.sprinting ? 1 : body.stance === 'crouch' ? 0.3 : 0.6, this.surfaceAt(pos)); } }
     }
@@ -357,7 +381,7 @@ export class GameSession {
     hud.update({ snap: this.snap, cfg: this.cfg, yaw: input.yaw, pos, mapView: this.mapView, geo: this.geo, stations: this.stations, boards: this.boards, others, myName: this.myName,
       prompt: st === 'alive' ? this.promptText() : null,
       spectatingName: y.spectating && (others.find(o => o.id === y.spectating)?.n), ads: aim, hideCrosshair: aim || body.sprinting || st !== 'alive',
-      spread: def ? (def.spreadHip * 400 + 4) * (Math.hypot(body.vel.x, body.vel.z) > 1 ? 1.5 : 1) : 6, sniperScope: sniper,
+      spread: def ? (def.spreadHip * 400 + 4) * (Math.hypot(body.vel.x, body.vel.z) > 1 ? 1.5 : 1) : 6, sniperScope: sniper, breath: sniper ? { left: this.sway?.breath ?? 5, hold: !!this.sway?.hold } : null,
       netText: this.meta.mode === 'offline' ? `offline · ${this.meta.label}` : `ping ${Math.round(this.net.rtt * 1000)} ms · correções ${this.pred.corrections}` });
     if (this.shopOpen && !this.nearStation()) this.toggleShop(false);
 
@@ -420,7 +444,7 @@ export class GameSession {
       const d = this.cfg.weapons[it.data.id], R = this.cfg.rarity?.[it.rarity], CLS = { pistol: 'Pistola', smg: 'Submetralhadora', ar: 'Fuzil de assalto', shotgun: 'Escopeta', dmr: 'Fuzil de precisão', sniper: 'Sniper' };
       const held = this.snap.you.inv?.[this.snap.you.inv.active];
       return `<div class="lc-keys"><span>${keyHint('interact')} ${held && this.snap.you.inv.primary && this.snap.you.inv.secondary ? 'TROCAR' : 'EQUIPAR'}</span><span>${keyHint('ping')} MARCAR</span></div>
-        <div class="lootcard" style="--rc:${RAR_COLOR[it.rarity]}"><img src="assets/ui/w_${it.data.id}.png" alt=""><div><b>${d?.name}</b><small>${CLS[d?.class] ?? ''}</small><em>${R?.label ?? it.rarity}</em></div></div>`;
+        <div class="lootcard" style="--rc:${RAR_COLOR[it.rarity]}"><img src="${UI_URL}w_${it.data.id}.png" alt=""><div><b>${d?.name}</b><small>${CLS[d?.class] ?? ''}</small><em>${R?.label ?? it.rarity}</em></div></div>`;
     }
     if (it) return `${keyHint('interact')} ${this.pickupText(it.type, it.data)}`;
     const b = this.nearBoard(); if (b) return `<b>[F]</b> Aceitar contrato: ${b.name}`;
@@ -431,7 +455,7 @@ export class GameSession {
 
   dispose() {
     this.net.close();
-    this.input.removeEventListener('action', this.onAction);
+    this.input.off('action', this.onAction); this.input.off('release', this.onRelease); this.input.off('swap', this.onSwap); this.input.off('fireDown', this.onFireDown);
     removeEventListener('keydown', this.keyTab); removeEventListener('keyup', this.keyTab);
     $('shop').removeEventListener('click', this.shopClick); $('shop').classList.add('hidden'); $('bigmap').classList.add('hidden');
     this.avatars.clear(); if (this.self) this.world.scene.remove(this.self.root, this.self.weapon); this.vm.space.parent?.remove(this.vm.space);

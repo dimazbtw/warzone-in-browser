@@ -437,3 +437,75 @@ table.results td, table.results th { padding: 4px 10px; border-bottom: 1px solid
 .lb-brand { width: auto; flex-wrap: wrap; } .lb-brand small { flex-basis: 100%; }
 #menu.lobby .lb-top { gap: 22px; }
 @media (max-width: 1750px) { .lb-tabs .nav { font-size: 16px; padding: 4px 11px; letter-spacing: 1px; } .lb-brand b, .lb-brand span { font-size: 28px; } .lb-subtabs { padding-left: 20px; font-size: 14px; } }
+#breath { position: absolute; left: 50%; top: 62%; transform: translateX(-50%); text-align: center; font-size: 13px; letter-spacing: 2px; text-shadow: 0 1px 3px #000; }
+#breath div { width: 160px; height: 3px; margin: 6px auto 0; background: rgba(255,255,255,.2); } #breath i { display: block; height: 100%; background: #fff; }
+
+/* ================================================================ HUD v4 — estilo "militar limpo": tipografia, linhas finas, degradês que somem */
+#hud { --hud-font: "Barlow Condensed", "Rajdhani", "Arial Narrow", sans-serif; --txt: #f2f4f5; --sub: #aeb8be; --sh: 0 1px 2px rgba(0,0,0,.85), 0 0 8px rgba(0,0,0,.35);
+  font-family: var(--hud-font); color: var(--txt); text-shadow: var(--sh); }
+#hud .ic { width: 1.05em; height: 1.05em; vertical-align: -0.15em; filter: drop-shadow(0 1px 1px rgba(0,0,0,.8)); }
+#hud kbd { font: 600 11px var(--hud-font); background: rgba(235,240,242,.92); color: #0c0f12; border-radius: 2px; padding: 0 4px; min-width: 16px; line-height: 15px; text-shadow: none; box-shadow: 0 1px 2px rgba(0,0,0,.5); }
+/* minimapa */
+#mmWrap { top: 22px; left: 26px; width: 228px; height: 228px; border: 1px solid rgba(255,255,255,.22); box-shadow: 0 0 0 1px rgba(0,0,0,.55); }
+#mmWrap .north { font-family: var(--hud-font); font-size: 13px; }
+/* zona / fase */
+#zoneInfo { top: 256px; left: 26px; width: 228px; font-size: 15px; }
+#zoneInfo .zrow { background: linear-gradient(90deg, rgba(10,14,18,.72), rgba(10,14,18,.25)); padding: 4px 8px; gap: 10px; }
+#zoneInfo .zt { gap: 5px; font-weight: 600; letter-spacing: .5px; color: var(--txt); flex: none; }
+#zoneInfo .zt em { width: 16px; height: 16px; font-size: 11px; border-color: rgba(255,255,255,.55); }
+#zoneInfo .zt.gas.on { color: #ffb070; } #zoneInfo .zt.ok { color: #9fe7b0; } #zoneInfo .zt.off { color: #ff8a80; }
+#zoneInfo .zwarn { background: linear-gradient(90deg, rgba(160,40,30,.8), rgba(160,40,30,.1)) !important; font-weight: 600; font-size: 14px; }
+/* contrato */
+#contract { top: 290px; left: 26px; width: 228px; border-left: 3px solid #e8b13a; background: linear-gradient(90deg, rgba(20,18,10,.78), rgba(20,18,10,.15)); padding: 6px 10px; font-size: 14px; }
+#contract h4 { color: #ffd36b; font-size: 14px; letter-spacing: 1.5px; font-weight: 700; }
+/* bússola */
+#compass { top: 10px; width: 640px; }
+#compassStrip span { font-size: 12px; color: var(--sub); } #compassStrip span.c { font-size: 16px; color: var(--txt); font-weight: 600; } #compassStrip span.t { height: 6px; opacity: .45; }
+#compassHead { background: none; border: 0; border-bottom: 2px solid var(--accent); color: var(--txt); font-size: 19px; font-weight: 600; line-height: 22px; top: 2px; min-width: 42px; }
+#poiName { top: 30px; color: #e9dfc0; font-size: 14px; letter-spacing: 3px; font-weight: 600; }
+/* contadores */
+#topright { top: 16px; right: 28px; gap: 20px; } #topright div { gap: 1px; } #topright .ic { width: 18px; height: 18px; color: var(--sub); } #topright b { font-size: 16px; font-weight: 600; } #topright .k .ic { color: #ff8a80; }
+/* killfeed */
+#killfeed { top: 64px; right: 28px; font-size: 15px; } #killfeed div { background: linear-gradient(270deg, rgba(10,14,18,.6), rgba(10,14,18,0)); padding: 2px 10px 2px 30px; margin-bottom: 2px; }
+/* squad */
+#squad { left: 26px; bottom: 22px; width: 240px; gap: 5px; }
+.sq-cash { background: none; padding: 0 0 2px; margin-bottom: 2px; justify-content: flex-start; gap: 6px; font-size: 16px; font-weight: 600; color: #b9f0c0; }
+.sq2 { background: linear-gradient(90deg, rgba(10,14,18,.6), rgba(10,14,18,0)); border-left: 0; padding: 3px 8px 5px 8px; }
+.sq2.me { background: linear-gradient(90deg, rgba(10,14,18,.75), rgba(10,14,18,0)); padding: 5px 8px 6px; }
+.sq-h { font-size: 15px; gap: 7px; } .sq2.me .sq-h { font-size: 17px; }
+.sq-h em { border-radius: 2px; width: 16px; height: 16px; font-size: 11px; box-shadow: 0 0 0 1px rgba(0,0,0,.4); }
+.sq-h b { color: var(--txt); font-weight: 600; letter-spacing: .5px; }
+.sq2 .bars { gap: 3px; margin-top: 4px; } .sq2 .bars i { height: 4px; transform: none; background: rgba(255,255,255,.14); } .sq2 .bars i::after { background: linear-gradient(90deg, #5fb6ff, #8fd0ff); }
+.sq2 .hp { height: 3px; margin-top: 3px; background: rgba(255,255,255,.14); } .sq2.me .hp { height: 5px; } .sq2 .hp i { background: #f5f7f8; } .sq2 .hp b { background: #ff5a3a; }
+.sq2 .stam { height: 2px; margin-top: 3px; opacity: .8; }
+/* equipamentos (placas/cura) */
+#equip { left: 280px; bottom: 24px; gap: 16px; align-items: flex-end; }
+.eq { width: auto; height: auto; background: none; border: 0; flex-direction: row; gap: 5px; align-items: center; font-size: 20px; }
+.eq .ic { width: 22px; height: 22px; } .eq b { font-size: 20px; font-weight: 600; }
+#invHint { bottom: 10px; font-size: 12px; letter-spacing: 2px; color: var(--sub); }
+/* arma */
+#weapon { right: 28px; bottom: 22px; gap: 6px; }
+#weapon .gear { gap: 18px; } #weapon .g { font-size: 17px; gap: 5px; font-weight: 600; } #weapon .g .ic { width: 22px; height: 22px; }
+.wcard { width: 280px; background: linear-gradient(270deg, rgba(10,14,18,.6), rgba(10,14,18,0)); border: 0; padding: 4px 4px 4px 20px; }
+.wc-name { font-size: 15px; font-weight: 600; letter-spacing: 1px; color: var(--txt); text-transform: uppercase; }
+.wc-body { align-items: center; } .wc-body img { width: 116px; height: 44px; opacity: .92; }
+.wc-knife .ic { width: 40px; height: 40px; }
+.wc-ammo b { font-size: 50px; font-weight: 500; letter-spacing: -1px; } .wc-ammo span { font-size: 20px; color: var(--sub); font-weight: 500; }
+.wc-foot { font-size: 12px; color: var(--sub); } .wc-foot .dots { color: var(--txt); } .wc-other { font-size: 12px; color: var(--sub); opacity: 1; }
+#weapon .warnAmmo { font-size: 13px; letter-spacing: 2px; color: #ff6a5a; font-weight: 700; }
+/* loot */
+.lc-keys { font-size: 13px; font-weight: 600; justify-content: space-between; }
+.lootcard { background: linear-gradient(90deg, color-mix(in srgb, var(--rc) 28%, rgba(10,14,18,.85)), rgba(10,14,18,.55)); border: 0; border-top: 2px solid var(--rc); box-shadow: none; }
+.lootcard b { font-size: 17px; font-weight: 600; letter-spacing: .5px; text-transform: uppercase; }
+/* faixa de contrato */
+#banner .bn-ic { width: 70px; height: 70px; font-size: 32px; background: none; color: #ffd36b; clip-path: none; border: 2px solid #e8b13a; transform: rotate(45deg); margin-bottom: 10px; }
+#banner .bn-ic > * { transform: rotate(-45deg); }
+#banner .bn-row { background: linear-gradient(90deg, transparent, rgba(10,14,18,.8) 15%, rgba(10,14,18,.8) 85%, transparent); padding: 8px 60px; }
+#banner .bn-row b { font-size: 28px; font-weight: 600; letter-spacing: 4px; color: #ffd36b; } #banner .bn-row i { color: #e8b13a; font-size: 30px; }
+#center { font-family: var(--hud-font); font-weight: 600; letter-spacing: 4px; font-size: 28px; }
+#toast { font-family: var(--hud-font); letter-spacing: 1px; }
+#killBanner b { font-family: var(--hud-font); } #killBanner i .ic { width: 30px; height: 30px; color: #ff5a4a; }
+/* mira fina */
+#crosshair i:nth-child(1), #crosshair i:nth-child(2) { width: 2px; height: 7px; } #crosshair i:nth-child(3), #crosshair i:nth-child(4) { width: 7px; height: 2px; }
+#crosshair b { display: none; }
+#contract { text-align: left; } #contract h4 { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
