@@ -1,6 +1,8 @@
 import { settings } from '../core/Settings.js';
 import { career, levelFromXp } from '../core/Career.js';
 import { OPERATORS, MODES, DIFFICULTIES, PLAYER_COUNTS, operatorOf } from '../core/Operators.js';
+import { challenges } from '../core/Challenges.js';
+import { makeConfig } from '../../shared/config.js';
 import { KEYMAP, KEY_LABELS, keyName } from '../game/InputSystem.js';
 
 const $ = id => document.getElementById(id);
@@ -62,31 +64,76 @@ export class Menu {
     $('connectOnline').onclick = () => this.onPlayOnline($('partyCode').value.trim());
     $('playerName').value = settings.get('name');
     $('playerName').oninput = e => { settings.set('name', e.target.value.slice(0, 16)); this.renderCard(); };
-    this.renderPlay(); this.renderOperators(); this.renderCard();
+    this.cfg = makeConfig({}); this.chKind = 'daily'; this.screen = 'home';
+    document.querySelectorAll('[data-ch]').forEach(b => b.onclick = () => { this.chKind = b.dataset.ch; this.renderChallenges(); });
+    $('tokUse').onclick = () => { if (career.useToken()) this.renderQuest(); };
+    $('muteBtn').onclick = () => { const v = settings.get('volume') > 0 ? 0 : 0.6; settings.set('volume', v); $('muteBtn').textContent = v ? '🔊' : '🔇'; };
+    this.renderPlay(); this.renderOperators(); this.renderCard(); this.renderLobby();
     renderSettings($('settingsBox')); renderControls($('controlsBox'));
+    setInterval(() => { if (!$('menu').classList.contains('hidden')) this.renderTimers(); }, 30000);
   }
-  show(on = true) { $('menu').classList.toggle('hidden', !on); if (on) { this.renderCard(); this.renderCareer(); } }
+  show(on = true) { $('menu').classList.toggle('hidden', !on); if (on) { this.renderCard(); this.renderCareer(); this.renderLobby(); } }
+  /** Estado lido pela cena 3D do lobby (operador, arma exibida, enquadramento da câmera). */
+  get view() { return { operator: settings.get('operator'), weapon: settings.get('lobbyWeapon') || 'rifle', focus: this.screen === 'weapons' ? 'weapons' : this.screen === 'operator' ? 'operators' : 'lobby' }; }
   go(screen) {
     document.querySelectorAll('[data-screen]').forEach(s => s.classList.toggle('hidden', s.dataset.screen !== screen));
     document.querySelectorAll('.nav').forEach(n => n.classList.toggle('on', n.dataset.go === screen));
     if (screen === 'career') this.renderCareer();
     if (screen === 'settings') renderSettings($('settingsBox'));
+    if (screen === 'weapons') this.renderWeapons();
+    if (screen === 'play') return this.go('home');
     this.screen = screen;
   }
 
   renderCard() {
-    const op = operatorOf(settings.get('operator')), lv = career.level;
-    $('playerCard').innerHTML = `<img src="${op.img}" alt=""><div class="lv">${lv.level}</div><div style="flex:1"><b>${esc(settings.get('name') || 'Jogador')}</b><div class="muted">${op.name} · ${career.data.wins} vitórias</div><div class="xpbar"><i style="width:${Math.round(lv.progress * 100)}%"></i></div></div>`;
+    const op = operatorOf(settings.get('operator')), lv = career.level, deg = Math.round(lv.progress * 360);
+    $('playerCard').innerHTML = `<div class="ring" style="--p:${deg}deg"><b>${lv.level}</b></div><div class="pc-txt"><b>${esc(settings.get('name') || 'Jogador')}</b><small>${op.name} · ${career.data.wins} vitórias</small></div>`;
+    $('opTag').innerHTML = `<b>${lv.level}</b><span>${esc(settings.get('name') || 'Jogador')}</span>`;
   }
 
   renderPlay() {
     const m = this.mode;
-    $('modeTiles').innerHTML = MODES.map(x => `<div class="tile ${m.squadSize === x.size ? 'on' : ''}" data-size="${x.size}"><div class="ic">${x.ic}</div><b>${x.name}</b><small>${x.desc}</small></div>`).join('');
-    $('diffSeg').innerHTML = DIFFICULTIES.map(d => `<button class="${m.difficulty === d.id ? 'on' : ''}" data-d="${d.id}">${d.name}<small>${d.desc}</small></button>`).join('');
-    $('playersSeg').innerHTML = PLAYER_COUNTS.map(p => `<button class="${m.players === p.n ? 'on' : ''}" data-n="${p.n}">${p.n}<small>${p.desc}</small></button>`).join('');
-    $('modeTiles').onclick = e => { const t = e.target.closest('[data-size]'); if (t) { m.squadSize = +t.dataset.size; this.renderPlay(); } };
-    $('diffSeg').onclick = e => { const t = e.target.closest('[data-d]'); if (t) { m.difficulty = t.dataset.d; this.renderPlay(); } };
-    $('playersSeg').onclick = e => { const t = e.target.closest('[data-n]'); if (t) { m.players = +t.dataset.n; this.renderPlay(); } };
+    $('teamCards').innerHTML = MODES.map(x => `<button class="team-card ${m.squadSize === x.size ? 'on' : ''}" data-size="${x.size}" style="background-image:url('assets/ui/squad_${x.size}.jpg')"><b>${x.name}</b><small>${x.desc}</small></button>`).join('');
+    $('diffSeg').innerHTML = DIFFICULTIES.map(d => `<button class="${m.difficulty === d.id ? 'on' : ''}" data-d="${d.id}" title="${d.desc}">${d.name}</button>`).join('');
+    $('playersSeg').innerHTML = PLAYER_COUNTS.map(p => `<button class="${m.players === p.n ? 'on' : ''}" data-n="${p.n}" title="${p.desc}">${p.n}</button>`).join('');
+    $('teamCards').onclick = e => { const t = e.target.closest('[data-size]'); if (t) { m.squadSize = +t.dataset.size; settings.set('lastMode', m); this.renderPlay(); } };
+    $('diffSeg').onclick = e => { const t = e.target.closest('[data-d]'); if (t) { m.difficulty = t.dataset.d; settings.set('lastMode', m); this.renderPlay(); } };
+    $('playersSeg').onclick = e => { const t = e.target.closest('[data-n]'); if (t) { m.players = +t.dataset.n; settings.set('lastMode', m); this.renderPlay(); } };
+    $('modeSub').textContent = `${MODES.find(x => x.size === m.squadSize)?.name ?? ''} · ${m.players} JOGADORES · ${DIFFICULTIES.find(d => d.id === m.difficulty)?.name ?? ''}`;
+  }
+
+  renderLobby() { this.renderChallenges(); this.renderQuest(); this.renderTimers(); }
+  renderTimers() {
+    const r = challenges.resetIn(), f = ms => { const h = Math.floor(ms / 3600000), d = Math.floor(h / 24); return d ? `${d}D ${h % 24}H` : `${h}H ${Math.floor(ms / 60000) % 60}M`; };
+    $('chDaily').textContent = f(r.daily); $('chWeekly').textContent = f(r.weekly);
+    $('resetInfo').textContent = `⏱ ${f(r.daily)}`;
+    const end = new Date(new Date().getFullYear(), new Date().getMonth() + 2, 1); $('seasonLeft').textContent = `${Math.ceil((end - Date.now()) / 86400000)} DIAS RESTANTES`;
+  }
+  renderChallenges() {
+    document.querySelectorAll('[data-ch]').forEach(b => b.classList.toggle('on', b.dataset.ch === this.chKind));
+    const list = challenges.list(this.chKind);
+    $('chList').innerHTML = list.map(c => `<div class="ch ${c.done ? 'done' : ''}"><div class="ch-ic">${c.done ? '✔' : '◈'}</div><div class="ch-txt">${c.text}<div class="ch-bar"><i style="width:${c.p / c.n * 100}%"></i></div></div><div class="ch-prog"><b>${c.done ? c.n : c.p}</b><span>${c.n}</span></div><div class="ch-xp"><i>XP</i>${c.xp}</div></div>`).join('')
+      + `<div class="ch bonus"><div class="ch-ic">✚</div><div class="ch-txt"><b>BÔNUS:</b> jogue e sobreviva para ganhar XP de carreira</div><div class="ch-prog"><b>∞</b></div><div class="ch-xp ok">✓</div></div>`;
+    $('chCount').textContent = list.filter(c => !c.done).length;
+  }
+  renderQuest() {
+    const d = career.data, max = 10, now = Math.min(max, d.wins);
+    $('questNow').textContent = now; $('questMax').textContent = max; $('questBar').style.width = `${now / max * 100}%`;
+    $('tokCount').textContent = d.tokens; $('tokInfo').textContent = `${d.tokens} FICHAS DE XP`;
+    $('tokLabel').innerHTML = d.bonus ? '<b style="color:var(--green)">XP EM DOBRO</b> NA PRÓXIMA PARTIDA' : 'SEM BÔNUS DE XP ATIVO';
+    $('tokUse').classList.toggle('on', d.bonus); $('tokUse').disabled = d.bonus || d.tokens <= 0;
+  }
+  /** Aba ARMAS: lista por família + atributos da selecionada (exibida no operador do lobby). */
+  renderWeapons() {
+    const W = this.cfg.weapons, sel = settings.get('lobbyWeapon') || 'rifle', groups = { pistol: 'PISTOLAS', smg: 'SUBMETRALHADORAS', ar: 'FUZIS DE ASSALTO', shotgun: 'ESCOPETAS', dmr: 'PRECISÃO', sniper: 'PRECISÃO' };
+    const byG = {}; for (const [id, w] of Object.entries(W)) (byG[groups[w.class] ?? 'OUTRAS'] ??= []).push([id, w]);
+    $('weaponList').innerHTML = Object.entries(byG).map(([g, ws]) => `<div class="wp-group">${g}</div>` + ws.map(([id, w]) => `<button class="wp ${id === sel ? 'on' : ''}" data-w="${id}"><b>${w.name}</b><small>${w.slot === 'primary' ? 'PRIMÁRIA' : 'SECUNDÁRIA'} · ${w.mag} tiros</small></button>`).join('')).join('');
+    $('weaponList').onclick = e => { const b = e.target.closest('[data-w]'); if (b) { settings.set('lobbyWeapon', b.dataset.w); this.renderWeapons(); } };
+    const w = W[sel], all = Object.values(W), rel = (v, k) => v / Math.max(...all.map(x => x[k] * (x.pellets ?? 1)));
+    const bars = [['DANO', Math.min(1, w.damage * (w.pellets ? w.pellets * 0.55 : 1) / 115)], ['CADÊNCIA', w.rpm / Math.max(...all.map(x => x.rpm))], ['ALCANCE', w.range / Math.max(...all.map(x => x.range))],
+      ['PRECISÃO', 1 - w.spreadAds / Math.max(...all.map(x => x.spreadAds))], ['CONTROLE', 1 - (w.recoil - 0.5) / 3.2], ['MOBILIDADE', w.class === 'pistol' ? 1 : w.class === 'smg' ? 0.85 : w.class === 'ar' ? 0.65 : w.class === 'shotgun' ? 0.6 : 0.4]];
+    $('weaponStats').innerHTML = `<h3>${w.name}</h3>` + bars.map(([k, v]) => `<div class="wp-bar"><span>${k}</span><div><i style="width:${Math.round(Math.max(0.05, Math.min(1, v)) * 100)}%"></i></div></div>`).join('')
+      + `<div class="wp-meta">${w.damage}${w.pellets ? `×${w.pellets}` : ''} dano · ${w.rpm} disparos/min · pente ${w.mag} · recarga ${w.reload}s</div>`;
   }
 
   renderOperators() {

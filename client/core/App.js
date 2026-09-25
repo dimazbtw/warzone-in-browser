@@ -1,5 +1,6 @@
 import { settings } from './Settings.js';
 import { career, levelFromXp } from './Career.js';
+import { challenges } from './Challenges.js';
 import { offlineOverrides, MODES, DIFFICULTIES } from './Operators.js';
 import { NetClient } from '../net/NetClient.js';
 import { WebSocketTransport, WorkerTransport } from '../net/Transports.js';
@@ -10,6 +11,7 @@ import { AudioSystem } from '../audio/AudioSystem.js';
 import { HUDSystem } from '../ui/HUDSystem.js';
 import { Menu, renderSettings, renderControls } from '../ui/Menu.js';
 import { assets } from '../assets/AssetManager.js';
+import { LobbyScene } from '../render/LobbyScene.js';
 
 const $ = id => document.getElementById(id);
 const TIPS = [
@@ -32,6 +34,8 @@ export class App {
   constructor() {
     this.canvas = $('gl');
     this.world = new World(this.canvas);
+    this.lobby = new LobbyScene(this.world.renderer);   // hangar 3D do menu
+    addEventListener('resize', () => this.lobby.resize());
     this.input = new InputSystem(this.canvas);
     this.audio = new AudioSystem();
     this.hud = new HUDSystem();
@@ -132,6 +136,7 @@ export class App {
     const s = this.session, r = e.results.find(x => x.id === me);
     const won = e.winnerSquad && r?.squadId === e.winnerSquad;
     const rec = r ? career.record(r, { mode: s?.meta.label, squads: new Set(e.results.map(x => x.squadId)).size }) : null;
+    const chDone = r && s?.mstats ? challenges.record({ ...s.mstats, placement: r.placement, survived: r.survived }) : [];
     $('end').classList.remove('hidden');
     $('endTitle').textContent = won ? 'VITÓRIA!' : `${r?.placement ?? '?'}º LUGAR`;
     $('endTitle').style.color = won ? 'var(--accent)' : '#fff';
@@ -142,6 +147,7 @@ export class App {
       const lv = rec.after, up = rec.after.level > rec.before.level;
       $('endXp').innerHTML = `<b>+${rec.xp.total} XP</b>${up ? ` · <span style="color:var(--green)">SUBIU PARA O NÍVEL ${lv.level}!</span>` : ''}
         ${rec.xp.parts.map(([k, v]) => `<div class="line"><span>${k}</span><span>+${v}</span></div>`).join('')}
+        ${chDone.map(c => `<div class="line" style="color:var(--accent)"><span>✔ Desafio: ${c.text}</span><span>+${c.xp}</span></div>`).join('')}
         <div class="line" style="margin-top:6px"><span>Nível ${lv.level}</span><span>${lv.into}/${lv.needed}</span></div><div class="lvbar"><i style="width:0"></i></div>`;
       requestAnimationFrame(() => { const bar = $('endXp').querySelector('.lvbar i'); if (bar) bar.style.width = `${Math.round(lv.progress * 100)}%`; });
     } else $('endXp').innerHTML = '';
@@ -154,6 +160,9 @@ export class App {
     const dt = Math.min(0.1, (t - this.last) / 1000); this.last = t;
     this.fps = this.fps ? this.fps * 0.95 + (1 / Math.max(dt, 1e-3)) * 0.05 : 60;
     if (settings.get('showFps')) $('fps').textContent = `${Math.round(this.fps)} FPS`;
-    if (this.session) this.session.frame(dt, t / 1000);
+    // menu aberto (sem partida em andamento): renderiza o hangar do lobby com o operador
+    const menuOpen = !$('menu').classList.contains('hidden') && $('loading').classList.contains('hidden');
+    if (menuOpen && !this.session?.inMatch) this.lobby.render(dt, this.menu.view);
+    else if (this.session) this.session.frame(dt, t / 1000);
   }
 }

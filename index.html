@@ -5,84 +5,103 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Zona Ressurge</title>
 <meta name="description" content="Battle royale com ressurgimento, direto no navegador.">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="client/style.css">
 </head>
 <body>
 <canvas id="gl"></canvas>
 
 <!-- ======================= MENU ======================= -->
-<div id="menu" class="screen">
-  <div class="menu-bg"></div>
-  <header class="topbar">
-    <div class="brand">ZONA <b>RESSURGE</b></div>
-    <nav>
-      <button data-go="home" class="nav on">INÍCIO</button>
-      <button data-go="operator" class="nav">OPERADOR</button>
-      <button data-go="career" class="nav">CARREIRA</button>
-      <button data-go="settings" class="nav">CONFIGURAÇÕES</button>
-      <button data-go="controls" class="nav">CONTROLES</button>
-    </nav>
-    <div id="playerCard" class="player-card"></div>
+<div id="menu" class="screen lobby">
+  <div class="lobby-vignette"></div>
+  <header class="lb-top">
+    <div class="lb-brand"><b>ZONA</b><span>RESSURGE</span><small>TEMPORADA 1 · <em id="seasonLeft"></em></small></div>
+    <div class="lb-tabs">
+      <nav>
+        <button data-go="home" class="nav on">LOBBY</button>
+        <button data-go="weapons" class="nav">ARMAS</button>
+        <button data-go="operator" class="nav">OPERADORES</button>
+        <button data-go="career" class="nav">CARREIRA</button>
+        <button data-go="online" class="nav">ONLINE</button>
+        <button data-go="settings" class="nav">CONFIGURAÇÕES</button>
+        <button data-go="controls" class="nav">CONTROLES</button>
+      </nav>
+      <div class="lb-subtabs"><span id="tokInfo" class="gold"></span><span id="resetInfo"></span><span class="teal">GRÁTIS</span></div>
+    </div>
+    <div class="lb-right">
+      <button class="icon-btn" data-go="settings" title="Configurações">⚙</button>
+      <button class="icon-btn" id="muteBtn" title="Som">🔊</button>
+      <div id="playerCard" class="lb-player"></div>
+    </div>
   </header>
 
-  <section class="panel-screen" data-screen="home">
-    <div class="hero">
-      <h1>ZONA<span>RESSURGE</span></h1>
-      <p class="sub">Battle royale com ressurgimento · até 60 operadores · direto no navegador</p>
-      <div class="hero-actions">
-        <button class="cta" data-go="play">JOGAR</button>
-        <button class="ghost" data-go="online">MULTIPLAYER ONLINE</button>
+  <!-- LOBBY -->
+  <section class="lb-screen" data-screen="home">
+    <div class="lb-challenges glass">
+      <div class="ch-tabs"><button data-ch="daily" class="on">DIÁRIOS<small id="chDaily"></small></button><button data-ch="weekly">SEMANAIS<small id="chWeekly"></small></button></div>
+      <div id="chList"></div>
+      <div class="ch-foot" data-go="career"><i id="chCount"></i> VER PROGRESSO NA CARREIRA</div>
+    </div>
+    <div id="opTag" class="op-tag"></div>
+    <div class="lb-quest glass">
+      <div class="q-head"><div class="q-ic">✪</div><div><b>MISSÃO DO CAMPEÃO</b><small>Vença partidas para avançar</small><div class="q-bar"><i id="questBar"></i></div></div><div class="q-num"><b id="questNow">0</b><span id="questMax">10</span></div></div>
+      <div class="q-tokens"><div class="q-count" id="tokCount">0</div><div class="q-label" id="tokLabel">SEM BÔNUS DE XP ATIVO</div><button id="tokUse" class="tok">2×<small>XP</small></button><div class="tok ghosted">2×<small>ARMA</small></div><div class="tok ghosted">2×<small>PASSE</small></div></div>
+    </div>
+    <div class="lb-bottom">
+      <div class="lb-mode">
+        <div class="mode-title"><div class="mode-ic">▲</div><div><b>BATTLE ROYALE</b><small>RESSURGIMENTO · <span id="modeSub"></span></small></div></div>
+        <button class="lb-start" id="startOffline"><b>INICIAR</b><span>ENCONTRAR PARTIDA</span></button>
       </div>
-      <ul class="bullets">
-        <li><b>Ressurgimento:</b> morreu com um aliado vivo? Você volta de paraquedas.</li>
-        <li><b>Contratos</b>, <b>estações de compra</b> e <b>baús</b> por todo o mapa.</li>
-        <li>Slide, mantle, escalada, prédios com interior e bots que lutam entre si.</li>
-      </ul>
+      <div class="lb-team">
+        <div class="lb-label">TAMANHO DO SQUAD</div>
+        <div class="team-cards" id="teamCards"></div>
+        <div class="lb-opts"><div><span>BOTS</span><div class="seg mini" id="diffSeg"></div></div><div><span>JOGADORES</span><div class="seg mini" id="playersSeg"></div></div></div>
+      </div>
     </div>
   </section>
 
-  <section class="panel-screen hidden" data-screen="play">
-    <h2>NOVA PARTIDA <small>contra bots · roda no seu navegador</small></h2>
-    <div class="group"><h3>MODO</h3><div class="tiles" id="modeTiles"></div></div>
-    <div class="row2">
-      <div class="group"><h3>DIFICULDADE DOS BOTS</h3><div class="seg" id="diffSeg"></div></div>
-      <div class="group"><h3>JOGADORES NA PARTIDA</h3><div class="seg" id="playersSeg"></div></div>
+  <!-- ARMAS -->
+  <section class="lb-screen side hidden" data-screen="weapons">
+    <div class="glass side-panel">
+      <h2>ARMAS <small>arma exibida no lobby</small></h2>
+      <div id="weaponList" class="wp-list"></div>
+      <div id="weaponStats" class="wp-stats"></div>
     </div>
-    <div class="actions"><button class="ghost" data-go="home">VOLTAR</button><button class="cta" id="startOffline">INICIAR PARTIDA</button></div>
   </section>
 
-  <section class="panel-screen hidden" data-screen="online">
-    <h2>MULTIPLAYER ONLINE <small>requer o servidor (npm start)</small></h2>
-    <div class="group narrow">
-      <label>Código de party (mesmo código = mesmo squad)<input id="partyCode" maxlength="12" placeholder="ex.: TIGRES" autocomplete="off"></label>
-      <div class="actions left"><button class="cta" id="connectOnline">CONECTAR</button><button class="ghost" data-go="home">VOLTAR</button></div>
+  <!-- OPERADORES -->
+  <section class="lb-screen side hidden" data-screen="operator">
+    <div class="glass side-panel">
+      <h2>OPERADORES</h2>
+      <label class="field">Nome em jogo<input id="playerName" maxlength="16" placeholder="Seu nome" autocomplete="off"></label>
+      <div class="op-grid" id="opGrid"></div>
+    </div>
+  </section>
+
+  <section class="lb-screen side hidden" data-screen="online">
+    <div class="glass side-panel">
+      <h2>MULTIPLAYER ONLINE <small>requer o servidor (npm start)</small></h2>
+      <label class="field">Código de party (mesmo código = mesmo squad)<input id="partyCode" maxlength="12" placeholder="ex.: TIGRES" autocomplete="off"></label>
+      <div class="actions left"><button class="cta" id="connectOnline">CONECTAR</button></div>
       <p id="onlineStatus" class="muted"></p>
+      <div id="lobbyBox" class="group hidden"><div id="lobbyHead"></div><div id="lobbyList"></div></div>
     </div>
-    <div id="lobbyBox" class="group hidden"><div id="lobbyHead"></div><div id="lobbyList"></div></div>
   </section>
 
-  <section class="panel-screen hidden" data-screen="operator">
-    <h2>OPERADOR</h2>
-    <div class="group narrow"><label>Nome em jogo<input id="playerName" maxlength="16" placeholder="Seu nome" autocomplete="off"></label></div>
-    <div class="op-grid" id="opGrid"></div>
+  <section class="lb-screen side wide hidden" data-screen="career">
+    <div class="glass side-panel"><h2>CARREIRA</h2><div id="careerBox"></div></div>
   </section>
 
-  <section class="panel-screen hidden" data-screen="career">
-    <h2>CARREIRA</h2>
-    <div id="careerBox"></div>
+  <section class="lb-screen side wide hidden" data-screen="settings">
+    <div class="glass side-panel"><h2>CONFIGURAÇÕES</h2><div id="settingsBox" class="settings-grid"></div></div>
   </section>
 
-  <section class="panel-screen hidden" data-screen="settings">
-    <h2>CONFIGURAÇÕES</h2>
-    <div id="settingsBox" class="settings-grid"></div>
+  <section class="lb-screen side wide hidden" data-screen="controls">
+    <div class="glass side-panel"><h2>CONTROLES</h2><div id="controlsBox" class="controls-grid"></div></div>
   </section>
 
-  <section class="panel-screen hidden" data-screen="controls">
-    <h2>CONTROLES</h2>
-    <div id="controlsBox" class="controls-grid"></div>
-  </section>
-
-  <footer class="credits">Arte gerada com Higgsfield · Three.js · Código, nomes, mapa e sons originais</footer>
+  <footer class="credits">Three.js · Modelos 3D enviados pelo usuário · Código, nomes, mapa e sons originais</footer>
 </div>
 
 <!-- ======================= CARREGANDO ======================= -->

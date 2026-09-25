@@ -4,7 +4,7 @@
  * servidor envia (matchEnded.results), nunca de contadores do cliente.
  */
 const KEY = 'zr_career_v1';
-const EMPTY = { xp: 0, matches: 0, wins: 0, top5: 0, kills: 0, deaths: 0, damage: 0, contracts: 0, revives: 0, timePlayed: 0, bestPlacement: null, history: [] };
+const EMPTY = { xp: 0, matches: 0, wins: 0, top5: 0, kills: 0, deaths: 0, damage: 0, contracts: 0, revives: 0, timePlayed: 0, bestPlacement: null, history: [], tokens: 3, bonus: false };
 
 export const XP_RULES = { kill: 100, damage10: 1, contract: 250, revive: 75, minute: 30, win: 1500, top5: 500, top10: 200 };
 
@@ -36,6 +36,7 @@ class CareerStore {
   /** Registra o resultado de uma partida; retorna { xp, before, after } para a tela final. */
   record(r, meta = {}) {
     const d = this.data, before = levelFromXp(d.xp), xp = matchXp(r, meta.squads);
+    if (d.bonus) { xp.parts.push(['Ficha de XP em dobro', xp.total]); xp.total *= 2; d.bonus = false; }
     d.xp += xp.total; d.matches++; d.kills += r.kills; d.damage += r.damage; d.contracts += r.contracts; d.revives += r.revives ?? 0;
     d.deaths += r.deaths ?? 0; d.timePlayed += r.survived;
     if (r.placement === 1) d.wins++;
@@ -43,9 +44,13 @@ class CareerStore {
     d.bestPlacement = d.bestPlacement ? Math.min(d.bestPlacement, r.placement) : r.placement;
     d.history.unshift({ at: Date.now(), placement: r.placement, kills: r.kills, damage: r.damage, xp: xp.total, mode: meta.mode ?? '', survived: r.survived });
     d.history.length = Math.min(d.history.length, 20);
+    const after = levelFromXp(d.xp); d.tokens += Math.max(0, after.level - before.level);   // 1 ficha por nível
     this.save();
-    return { xp, before, after: levelFromXp(d.xp) };
+    return { xp, before, after };
   }
+  addXp(n) { const before = this.level.level; this.data.xp += n; this.data.tokens += Math.max(0, this.level.level - before); this.save(); }
+  /** Ativa uma ficha: a próxima partida rende XP em dobro. */
+  useToken() { const d = this.data; if (d.bonus || d.tokens <= 0) return false; d.tokens--; d.bonus = true; this.save(); return true; }
   reset() { this.data = { ...EMPTY, history: [] }; this.save(); }
 }
 export const career = new CareerStore();

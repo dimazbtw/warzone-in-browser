@@ -78,6 +78,7 @@ export class GameSession {
   }
   onMatchStart(p) {
     this.inMatch = true; this.ended = false;
+    this.mstats = { killsByClass: {}, kills: 0, revives: 0, chests: 0, contracts: 0, damage: 0 };   // para os desafios
     this.app.menu.show(false); this.app.showLoading(false); this.hud.show(true); $('end').classList.add('hidden');
     this.world.startMatch(p); this.avatars.clear();
     if (this.self) { this.world.scene.remove(this.self.root, this.self.weapon); }
@@ -132,9 +133,10 @@ export class GameSession {
       case 'lootSpawned': this.world.addLoot(e.item); break;
       case 'lootRemoved': this.world.removeLoot(e.id); break;
       case 'contractBoard': { const b = this.boards.get(e.id); if (b) b.taken = e.taken; this.world.setBoard(e.id, e.taken); break; }
-      case 'killfeed': this.avatars.kill(e.victimId); h.killfeed(`${e.attacker ?? '☣ zona'} ✖ ${e.victim}`, e.attackerId === me || e.victimId === me || this.isAlly(e.victimId)); if (e.attackerId === me) { h.hitmarker(false, true); a.kill(); h.xp('+100 ELIMINAÇÃO'); h.killBanner(e.victim, { head: e.part === 'head' || e.headshot, finisher: e.cause === 'finished' }); } break;
+      case 'killfeed': this.avatars.kill(e.victimId); h.killfeed(`${e.attacker ?? '☣ zona'} ✖ ${e.victim}`, e.attackerId === me || e.victimId === me || this.isAlly(e.victimId)); if (e.attackerId === me) { const wid = this.snap?.you.inv?.[this.snap.you.inv.active]?.id, cl = this.cfg.weapons[wid]?.class ?? 'ar'; this.mstats.kills++; this.mstats.killsByClass[cl] = (this.mstats.killsByClass[cl] ?? 0) + 1; h.hitmarker(false, true); a.kill(); h.xp('+100 ELIMINAÇÃO'); h.killBanner(e.victim, { head: e.part === 'head' || e.headshot, finisher: e.cause === 'finished' }); } break;
       case 'damage':
         if (e.attackerId === me) {
+          this.mstats.damage += e.amount ?? 0;
           h.hitmarker(e.part === 'head', false); a.hit(e.part === 'head'); if (e.armorBroken) a.crack();
           const v = this.interp.latest?.(e.victimId) ?? this.snap?.others.find(o => o.id === e.victimId);
           if (v && settings.get('damageNumbers') !== false) { const pr = new THREE.Vector3(v.x, v.y + 1.9, v.z).project(this.world.camera); if (pr.z < 1) h.damageNumber((pr.x * 0.5 + 0.5) * innerWidth, (-pr.y * 0.5 + 0.5) * innerHeight, e.amount, e.part === 'head' ? 'head' : e.armorHit ? 'armor' : ''); }
@@ -142,7 +144,7 @@ export class GameSession {
         if (e.victimId === me) { this.hurtT = performance.now(); if (e.fromX !== undefined && e.source !== 'zone') h.damageFrom(Math.atan2(e.fromX - this.pred.body.pos.x, -(e.fromZ - this.pred.body.pos.z))); }
         break;
       case 'downed': if (e.attackerId === me) h.notify(`${this.nameOf(e.victimId)} ABATIDO`, 1.5); else if (this.isAlly(e.victimId)) h.notify(`${this.nameOf(e.victimId)} FOI ABATIDO — reviva!`, 3); break;
-      case 'revived': if (e.playerId === me) h.announce('REVIVIDO!', 2); else if (e.reviverId === me) { h.notify('ALIADO REVIVIDO', 2); h.xp('+75 REVIVER'); } break;
+      case 'revived': if (e.playerId === me) h.announce('REVIVIDO!', 2); else if (e.reviverId === me) { this.mstats.revives++; h.notify('ALIADO REVIVIDO', 2); h.xp('+75 REVIVER'); } break;
       case 'respawned': if (this.isAlly(e.playerId)) h.notify(`${this.nameOf(e.playerId)} RETORNOU`, 2.5); break;
       case 'resurgenceDisabled': h.announce('RESSURGIMENTO DESATIVADO', 4); h.notify('Mortes agora são definitivas', 4); a.warn(); break;
       case 'zonePhase': h.notify(`FASE ${e.phase + 1}/${e.total}: nova zona marcada`, 3); break;
@@ -166,14 +168,14 @@ export class GameSession {
       case 'purchaseFailed': if (e.playerId === me) { h.notify(`Compra: ${e.reason}`, 2); a.warn(); } break;
       case 'contractStarted': h.announce(`CONTRATO: ${e.contract.name.toUpperCase()}`, 3); a.ui(); break;
       case 'contractUpdate': a.ui(); break;
-      case 'contractCompleted': h.announce(`CONTRATO CONCLUÍDO · +$${e.reward.cash} · +${e.reward.xp} XP`, 3.5); a.cash(); break;
+      case 'contractCompleted': this.mstats.contracts++; h.announce(`CONTRATO CONCLUÍDO · +$${e.reward.cash} · +${e.reward.xp} XP`, 3.5); a.cash(); break;
       case 'contractFailed': if (!e.start || e.playerId === me) h.notify(`Contrato: ${e.reason}`, 2.5); break;
       case 'smoke': this.effects.smoke(e, e.radius, e.duration); a.smokePop(e); break;
       case 'melee': if (e.playerId !== me) a.whoosh(e); break;
       case 'meleeHit': if (e.attackerId === me) { a.stab(); h.hitmarker(false, e.finisher); if (e.finisher) h.xp('+150 FINALIZAÇÃO'); } break;
       case 'ping': this.pings = (this.pings ?? []).filter(p => p.by !== e.playerId); this.pings.push({ ...e, by: e.playerId, until: performance.now() + (e.kind === 'enemy' ? 5000 : 9000) }); a.ping(e.kind); if (e.playerId !== me) h.notify(`${e.name}: ${{ enemy: 'INIMIGO AVISTADO', loot: 'ITEM AQUI', go: 'VAMOS PARA LÁ' }[e.kind]}`, 2); break;
       case 'plateBroken': if (e.attackerId === me) a.crack(); break;
-      case 'chestOpened': this.world.setChestOpened(e.chestId); if (e.playerId === me) { a.cash(); h.notify('BAÚ ABERTO', 1.2); } break;
+      case 'chestOpened': this.world.setChestOpened(e.chestId); if (e.playerId === me) { this.mstats.chests++; a.cash(); h.notify('BAÚ ABERTO', 1.2); } break;
       case 'matchEnded':
         this.inMatch = false; this.ended = true; this.input.enabled = false;
         if (document.pointerLockElement) document.exitPointerLock();
