@@ -163,6 +163,15 @@ export class Animator {
       rig.twoBone(b['arm' + side], b['fore' + side], b['hand' + side], t, pole, rig.len.upper, rig.len.fore);
       const fq = b['fore' + side].getWorldQuaternion(Q());
       rig.setWorldQuaternion(b['hand' + side], fq.multiply(rig.handRestRel[side]));
+      // empunhadura (rigs com dedos): orienta a mão pela arma e fecha os dedos
+      const hold = Math.max(0, 1 - K.freefall - K.chute - K.dead - K.mantle - (side === 'L' ? K.downed + K.action * 0.7 : 0)) * (1 - K.hide) * (s.weapon ? 1 : 0);
+      if (rig.handBasis[side] && hold > 0.01) {
+        const wUp = V(0, 1, 0).applyQuaternion(wq), wRight = V(1, 0, 0).applyQuaternion(wq);
+        if (side === 'R') rig.orientHand('R', C(wUp).multiplyScalar(-0.85).addScaledVector(D, 0.3), C(wRight).negate(), hold);
+        else if (pistol) rig.orientHand('L', C(wUp).multiplyScalar(-0.3).addScaledVector(D, 0.5).addScaledVector(wRight, 0.4), C(wUp).multiplyScalar(0.6).addScaledVector(wRight, 0.8), hold);
+        else rig.orientHand('L', C(D).multiplyScalar(0.6).addScaledVector(wRight, 0.6), C(wUp), hold);
+        rig.curlFingers(side, side === 'R' ? [1.2, 1.1, 0.8] : [0.9, 0.8, 0.6], side === 'R' ? 0.6 : 0.4, hold);
+      }
     };
     if (!this.bakedArms) { hand('R'); hand('L'); }
 

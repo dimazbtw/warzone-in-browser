@@ -11,10 +11,8 @@ npm test             # 56 testes
 ```
 **Sem servidor:** abra `index.html` servido por qualquer servidor estático (ex.: `python3 -m http.server`) e escolha *Jogar offline*. A simulação inteira do servidor roda num Web Worker, com bots e 3 dificuldades.
 
-Modelos 3D em `assets/models/`: os operadores **Caveira** (`operator_1.glb`) e **Duna** (`operator_2.glb`) e a aeronave KC-10 (`aircraft.glb`). O fuzil de 1ª pessoa vem do CDN do Higgsfield.
-Armas (`assets/models/weapons/`): 10 modelos enviados pelo usuário, otimizados com gltf-transform (texturas WebP ≤1024 px, AK simplificado; 81 MB → 14 MB). O `RealWeapons` normaliza a orientação e o tamanho de cada uma (confira em `tools/weapons.html`). Arsenal: Vespa 9, Sagui 9, Onça .45 (pistolas); Colibri, Morcego, Quati (SMGs); Carcará AR, Jaguar AK; Harpia DMR, Gavião SR (com luneta); Tatu 12 (escopeta procedural).
-Braços de 1ª pessoa (`arms.glb`, espelhado para a mão esquerda) com FOV próprio de 50° (`tools/viewmodel.html`) e paraquedas (`parachute.glb`).
-Os operadores são malhas estáticas. O `AutoRig` cria o esqueleto de 24 ossos na hora de carregar, então pernas, quadril, tronco e cabeça são animados por IK, e braços e fuzil ficam presos ao peito. Os retratos do menu são renderizados dos próprios modelos (`tools/portrait.html`). Sem os arquivos, o jogo usa um humanoide procedural.
+Modelos 3D em `assets/models/`. O operador é o **KSK** (`operator_ksk.glb`), rigado com esqueleto Mixamo e dedos, em duas variantes: **Lobo** (floresta) e **Carcaça** (deserto). O esqueleto do próprio modelo é usado: pernas, tronco e cabeça por IK, os braços seguram a arma equipada, as mãos se orientam pela arma e os dedos fecham na empunhadura. A aeronave é o KC-10 (`aircraft.glb`).
+Um modelo sem esqueleto também funciona: o `AutoRig` cria um na hora, mas aí braços e arma embutida ficam presos ao peito. Os retratos do menu são renderizados com o operador posado (`tools/portrait.html`).
 - `/`: cliente 3D multiplayer
 - `/client-debug/`: cliente 2D para depurar o servidor
 - `/offline/`: protótipo single-player antigo

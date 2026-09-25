@@ -1,8 +1,9 @@
 /** Operadores selecionáveis: modelos 3D enviados pelo usuário (assets/models) + retratos renderizados deles. */
 export const OPERATORS = [
-  { id: 'caveira', name: 'CAVEIRA', desc: 'Força-tarefa noturna', model: 'operator_1', img: 'assets/portraits/operator_1.png', tint: 0x8c8c8c, swatch: '#3a3d42' },
-  { id: 'duna',    name: 'DUNA',    desc: 'Especialista do deserto', model: 'operator_2', img: 'assets/portraits/operator_2.png', tint: 0xe0c89c, swatch: '#b8a27a' },
-];
+  // KSK: modelo rigado (esqueleto Mixamo, dedos articulados) — braços por IK e arma equipada na mão
+  { id: 'ksk',     name: 'LOBO',     desc: 'Forças especiais · floresta', model: 'operator_ksk', img: 'assets/portraits/operator_ksk.png', tint: 0xffffff, swatch: '#5a6a3a' },
+  { id: 'ksk_des', name: 'CARCAÇA',  desc: 'Forças especiais · deserto',  model: 'operator_ksk', img: 'assets/portraits/operator_ksk_des.png', tint: 0xd8c29a, swatch: '#b8a27a' },
+]
 export const operatorOf = i => OPERATORS[((i ?? 0) % OPERATORS.length + OPERATORS.length) % OPERATORS.length];
 
 /** Modos e dificuldades do modo offline. */

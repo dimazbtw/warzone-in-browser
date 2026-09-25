@@ -1,18 +1,21 @@
 <!doctype html><html><head><meta charset="utf-8"><style>body{margin:0}</style>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script></head><body>
 <script type="module">
-// Gera o retrato do operador para o menu: ?m=operator_1  (usado por tools/ para criar assets/portraits)
-import * as THREE from 'three'; import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-const W = 480, H = 640, r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); r.setSize(W, H); r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; document.body.appendChild(r.domElement);
+// Retrato do operador para o menu, posado pelo Animator com um fuzil: ?op=0
+import * as THREE from 'three';
+import { assets } from '../client/assets/AssetManager.js';
+import { characters } from '../client/render/characters/CharacterFactory.js';
+const op = +(new URLSearchParams(location.search).get('op') ?? 0), W = 480, H = 640;
+const r = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true }); r.setSize(W, H); r.outputColorSpace = THREE.SRGBColorSpace; r.toneMapping = THREE.ACESFilmicToneMapping; document.body.appendChild(r.domElement);
 const s = new THREE.Scene();
 const c = document.createElement('canvas'); c.width = 2; c.height = 256; const g = c.getContext('2d'), gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#3b4148'); gr.addColorStop(1, '#101215'); g.fillStyle = gr; g.fillRect(0, 0, 2, 256);
 s.background = new THREE.CanvasTexture(c); s.background.colorSpace = THREE.SRGBColorSpace;
-s.add(new THREE.HemisphereLight(0xdde6ff, 0x302820, 1.6));
-const key = new THREE.DirectionalLight(0xffe2c0, 3.2); key.position.set(-2, 3, 3); s.add(key);
-const rim = new THREE.DirectionalLight(0x9ec8ff, 2.5); rim.position.set(3, 2, -3); s.add(rim);
-const o = (await new GLTFLoader().loadAsync(`/assets/models/${new URLSearchParams(location.search).get('m')}.glb`)).scene;
-const b = new THREE.Box3().setFromObject(o), sz = b.getSize(new THREE.Vector3()), k = 1.8 / sz.y, cc = b.getCenter(new THREE.Vector3());
-o.scale.setScalar(k); o.position.set(-cc.x * k, -b.min.y * k, -cc.z * k); o.rotation.y = -0.35; s.add(o);
-const cam = new THREE.PerspectiveCamera(26, W / H, 0.1, 50); cam.position.set(-0.5, 1.45, 2.9); cam.lookAt(0, 1.18, 0);
+s.add(new THREE.HemisphereLight(0xdde6ff, 0x302820, 1.8));
+const key = new THREE.DirectionalLight(0xffe2c0, 3.4); key.position.set(-2, 3, -3); s.add(key);
+const rim = new THREE.DirectionalLight(0x9ec8ff, 2.6); rim.position.set(3, 2, 3); s.add(rim);
+await assets.wait(60000);
+const ch = characters.create({ operator: op }); ch.setWeapon('rifle'); s.add(ch.root, ch.weapon);
+for (let i = 0; i < 60; i++) ch.animator.update(1 / 60, { x: 0, y: 0, z: 0, yaw: 0.45, pitch: -0.05, vx: 0, vz: 0, state: 'alive', stance: 'stand', grounded: true, weapon: 'rifle' });
+const cam = new THREE.PerspectiveCamera(26, W / H, 0.1, 50); cam.position.set(0.55, 1.45, -2.9); cam.lookAt(0, 1.2, 0);
 r.render(s, cam); window.ready = true;
 </script></body></html>

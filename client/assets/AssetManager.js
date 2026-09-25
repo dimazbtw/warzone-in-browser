@@ -8,8 +8,7 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
  */
 const HF = 'https://d8j0ntlcm91z4.cloudfront.net/user_3Jib0BzU3aLdeWOQjrliCwaWdFv/hf_20260924_';
 export const ASSET_LIST = {
-  operator_1: { local: 'assets/models/operator_1.glb', size: 3.6e5, label: 'Operador Caveira' },
-  operator_2: { local: 'assets/models/operator_2.glb', size: 3.9e5, label: 'Operador Duna' },
+  operator_ksk: { local: 'assets/models/operator_ksk.glb', size: 2.1e6, label: 'Operador' },
   aircraft:   { local: 'assets/models/aircraft.glb', size: 3.1e5, label: 'Aeronave' },
   arms:       { local: 'assets/models/arms.glb', size: 1.2e6, label: 'Braços (1ª pessoa)' },
   parachute:  { local: 'assets/models/parachute.glb', size: 7e4, label: 'Paraquedas' },
